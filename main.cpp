@@ -114,6 +114,7 @@ class Field {
           storage.bvals->add((uint32_t) size);
         }
       } break;
+      default: assert(0 && "unknown field type");
     }
 
     size++;
