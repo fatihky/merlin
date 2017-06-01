@@ -129,6 +129,18 @@ class Table {
   }
 };
 
+void insertRow(Table *table, int timestamp, string endpoint, int responseTime) {
+  table->fields["timestamp"]->addValue(GenericValueContainer((int64_t) timestamp));
+  table->fields["endpoint"]->addValue(GenericValueContainer(endpoint));
+  table->fields["responseTime"]->addValue(GenericValueContainer(responseTime));
+}
+
+void insertRows(Table *table) {
+  for (int i = 0; i < 1; ++i) {
+    insertRow(table, i + 1, "/home", rand());
+  }
+}
+
 int main() {
   std::cout << "Hello, World!" << std::endl;
 
@@ -142,6 +154,8 @@ int main() {
   table->setField(fieldTimestamp);
   table->setField(fieldEndpoint);
   table->setField(fieldResponseTime);
+
+  insertRows(table);
 
   delete fieldTimestamp;
   delete fieldEndpoint;
