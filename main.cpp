@@ -2,7 +2,7 @@
 #include <iostream>
 #include <map>
 #include <vector>
-//#include <stdint.h>
+#include <cassert>
 #include "deps/CRoaring/cpp/roaring.hh"
 
 using namespace std;
@@ -27,10 +27,10 @@ class GenericValueContainer {
   GenericValueContainer(int iVal_): iVal(iVal_) { type = FIELD_TYPE_INT; }
   GenericValueContainer(string strVal_): strVal(strVal_) { type = FIELD_TYPE_STRING; }
   GenericValueContainer(bool bVal_): bVal(bVal_) { type = FIELD_TYPE_BOOLEAN; }
-  inline int64_t getInt64Val () { return i64Val; }
-  inline int getIVal() { return iVal; }
-  inline string getStrVal() { return strVal; }
-  inline bool getBVal() { return bVal; }
+  const inline int64_t getInt64Val () const { return i64Val; }
+  const inline int getIVal() const { return iVal; }
+  const inline string getStrVal() const { return strVal; }
+  const inline bool getBVal() const { return bVal; }
 };
 
 class Field {
@@ -78,7 +78,7 @@ class Field {
     encoding = encoding_;
   }
 
-  void addValue(GenericValueContainer &genericValueContainer) {
+  void addValue(const GenericValueContainer &genericValueContainer) {
     assert(genericValueContainer.type === type);
 
     switch (type) {
