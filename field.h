@@ -26,8 +26,14 @@ struct aggr_func_max_data {
   Field *field;
 };
 
+struct aggr_func_sum_data {
+  uint64_t sum;
+  Field *field;
+};
+
 static bool aggrFuncMinInt(uint32_t value, void *data);
 static bool aggrFuncMaxInt(uint32_t value, void *data);
+static bool aggrFuncSumInt(uint32_t value, void *data);
 
 class Field {
   public:
@@ -193,6 +199,22 @@ class Field {
 
     return ctx.max;
   }
+
+  uint64_t aggrFuncSum(Roaring *bitmap) {
+    const auto field = this;
+    const aggr_func_sum_data ctx = {
+      .sum = 0,
+      .field = this
+    };
+
+    if (type != FIELD_TYPE_INT) {
+      throw std::runtime_error("only int fields supported by sum()");
+    }
+
+    bitmap->iterate(aggrFuncSumInt, (void *) &ctx);
+
+    return ctx.sum;
+  }
 };
 
 
@@ -214,6 +236,15 @@ static bool aggrFuncMaxInt(uint32_t value, void *data) {
   if (ival > ctx->max) {
     ctx->max = (uint64_t) ival;
   }
+
+  return true;
+}
+
+static bool aggrFuncSumInt(uint32_t value, void *data) {
+  const auto ctx = (aggr_func_sum_data *) data;
+  const auto ival = ctx->field->storage.ivals[value];
+
+  ctx->sum += ival;
 
   return true;
 }
