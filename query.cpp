@@ -101,6 +101,12 @@ void Query::genResultRows() {
           const auto sum = field->aggrFuncSum(aggrGroup->bitmap);
           cout << "[" << sum << "] ";
           row->values.push_back(new GenericValueContainer(sum));
+        } else if (selectExpr->aggerationFunc == "avg") {
+          const auto field = table->fields[selectExpr->field];
+          const auto sum = field->aggrFuncSum(aggrGroup->bitmap);
+          const auto avg = sum / aggrGroup->bitmap->cardinality();
+          cout << "[" << avg << "] ";
+          row->values.push_back(new GenericValueContainer(avg));
         } else {
           throw std::runtime_error("unknown aggregation function: " + selectExpr->aggerationFunc + " -- " + (selectExpr->aggerationFunc == "count" ? "true" : "false"));
         }
@@ -238,6 +244,7 @@ void runQuery(Table *table) {
   SelectExpr *selectExprMinResponseTime = new SelectExpr("responseTime", "min", "min(responseTime)");
   SelectExpr *selectExprMaxResponseTime = new SelectExpr("responseTime", "max", "max(responseTime)");
   SelectExpr *selectExprSumResponseTime = new SelectExpr("responseTime", "sum", "sum(responseTime)");
+  SelectExpr *selectExprAvgResponseTime = new SelectExpr("responseTime", "avg", "avg(responseTime)");
   OrderByExpr *orderByExprCount = new OrderByExpr("count");
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
@@ -248,6 +255,7 @@ void runQuery(Table *table) {
   query->selectExprs.push_back(selectExprMinResponseTime);
   query->selectExprs.push_back(selectExprMaxResponseTime);
   query->selectExprs.push_back(selectExprSumResponseTime);
+  query->selectExprs.push_back(selectExprAvgResponseTime);
   query->orderByExprs.push_back(orderByExprCount);
   // apply filters
   query->applyFilters();
