@@ -79,11 +79,20 @@ void Query::genResultRows() {
 
     for (auto &&selectExpr : selectExprs) {
       if (selectExpr->isAggerationSelect) {
-        assert(0 && "aggregation selects not supported yet");
-      }
+        if (selectExpr->aggerationFunc != "count") {
+          assert(0 && "only count aggregation function is supported at the moment");
+        }
 
-      cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
-      row->values.push_back(new GenericValueContainer(aggrGroup->valueMap[selectExpr->field]));
+        if (selectExpr->field != "*") {
+          assert(0 && "only '*' is supported for count()");
+        }
+
+        cout << "[" << aggrGroup->bitmap->cardinality() << "] ";
+        row->values.push_back(new GenericValueContainer(aggrGroup->bitmap->cardinality()));
+      } else {
+        cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
+        row->values.push_back(new GenericValueContainer(aggrGroup->valueMap[selectExpr->field]));
+      }
     }
 
     cout << endl;
@@ -100,11 +109,13 @@ void runQuery(Table *table) {
   GroupByExpr *groupByExprGender = new GroupByExpr("gender");
   SelectExpr *selectExprEndpoint = new SelectExpr("endpoint");
   SelectExpr *selectExprGender = new SelectExpr("gender");
+  SelectExpr *selectExprCount = new SelectExpr("*", "count");
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
   query->groupByExprs.push_back(groupByExprGender);
   query->selectExprs.push_back(selectExprEndpoint);
   query->selectExprs.push_back(selectExprGender);
+  query->selectExprs.push_back(selectExprCount);
   // apply filters
   query->applyFilters();
   cout << "after filter, bitmap: ";

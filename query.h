@@ -18,6 +18,7 @@ class SelectExpr {
   bool isAggerationSelect;
 
   SelectExpr(string field_): field(field_), isAggerationSelect(false) {}
+  SelectExpr(string field_, string aggerationFunc_): field(field_), aggerationFunc(aggerationFunc_), isAggerationSelect(true) {}
 };
 
 class FilterExpr {
