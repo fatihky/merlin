@@ -223,8 +223,8 @@ void runQuery(Table *table) {
   GroupByExpr *groupByExprGender = new GroupByExpr("gender");
   SelectExpr *selectExprEndpoint = new SelectExpr("endpoint");
   SelectExpr *selectExprGender = new SelectExpr("gender");
-  SelectExpr *selectExprCount = new SelectExpr("*", "count");
-  OrderByExpr *orderByExprCount = new OrderByExpr("*");
+  SelectExpr *selectExprCount = new SelectExpr("*", "count", "count");
+  OrderByExpr *orderByExprCount = new OrderByExpr("count");
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
   query->groupByExprs.push_back(groupByExprGender);
