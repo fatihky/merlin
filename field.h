@@ -21,7 +21,13 @@ struct aggr_func_min_data {
   Field *field;
 };
 
+struct aggr_func_max_data {
+  uint64_t max;
+  Field *field;
+};
+
 static bool aggrFuncMinInt(uint32_t value, void *data);
+static bool aggrFuncMaxInt(uint32_t value, void *data);
 
 class Field {
   public:
@@ -171,6 +177,22 @@ class Field {
 
     return ctx.min;
   }
+
+  uint64_t aggrFuncMax(Roaring *bitmap) {
+    const auto field = this;
+    const aggr_func_max_data ctx = {
+      .max = 0,
+      .field = this
+    };
+
+    if (type != FIELD_TYPE_INT) {
+      throw std::runtime_error("only int fields supported by max()");
+    }
+
+    bitmap->iterate(aggrFuncMaxInt, (void *) &ctx);
+
+    return ctx.max;
+  }
 };
 
 
@@ -180,6 +202,17 @@ static bool aggrFuncMinInt(uint32_t value, void *data) {
 
   if (ival < ctx->min) {
     ctx->min = (uint64_t) ival;
+  }
+
+  return true;
+}
+
+static bool aggrFuncMaxInt(uint32_t value, void *data) {
+  const auto ctx = (aggr_func_max_data *) data;
+  const auto ival = ctx->field->storage.ivals[value];
+
+  if (ival > ctx->max) {
+    ctx->max = (uint64_t) ival;
   }
 
   return true;

@@ -91,6 +91,11 @@ void Query::genResultRows() {
           const auto min = field->aggrFuncMin(aggrGroup->bitmap);
           cout << "[" << min << "] ";
           row->values.push_back(new GenericValueContainer(min));
+        } else if (selectExpr->aggerationFunc == "max") {
+          const auto field = table->fields[selectExpr->field];
+          const auto max = field->aggrFuncMax(aggrGroup->bitmap);
+          cout << "[" << max << "] ";
+          row->values.push_back(new GenericValueContainer(max));
         } else {
           throw std::runtime_error("unknown aggregation function: " + selectExpr->aggerationFunc + " -- " + (selectExpr->aggerationFunc == "count" ? "true" : "false"));
         }
@@ -226,6 +231,7 @@ void runQuery(Table *table) {
   SelectExpr *selectExprGender = new SelectExpr("gender");
   SelectExpr *selectExprCount = new SelectExpr("*", "count", "count");
   SelectExpr *selectExprMinResponseTime = new SelectExpr("responseTime", "min", "min(responseTime)");
+  SelectExpr *selectExprMaxResponseTime = new SelectExpr("responseTime", "max", "max(responseTime)");
   OrderByExpr *orderByExprCount = new OrderByExpr("count");
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
@@ -234,6 +240,7 @@ void runQuery(Table *table) {
   query->selectExprs.push_back(selectExprGender);
   query->selectExprs.push_back(selectExprCount);
   query->selectExprs.push_back(selectExprMinResponseTime);
+  query->selectExprs.push_back(selectExprMaxResponseTime);
   query->orderByExprs.push_back(orderByExprCount);
   // apply filters
   query->applyFilters();
