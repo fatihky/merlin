@@ -31,7 +31,7 @@ void Query::genAggrGroups() {
       vector<AggregationGroup *> aggrGroupsField;
       const auto groups = field->genGroups(initialBitmap);
       for (auto &&group : groups) {
-        const auto aggregationGroup = new AggregationGroup(group.first, group.second);
+        const auto aggregationGroup = new AggregationGroup(field->name, group.first, group.second);
         aggrGroupsField.push_back(aggregationGroup);
         cout << "created group for... " << group.first << " bitmap: ";
         aggregationGroup->bitmap->printf();
@@ -51,7 +51,7 @@ void Query::genAggrGroups() {
         const auto currentBitmap = groupByGroup->bitmap;
         const auto groups = field->genGroups(currentBitmap);
         for (auto &&group : groups) {
-          const auto aggregationGroup = groupByGroup->clone(group.first, group.second);
+          const auto aggregationGroup = groupByGroup->clone(field->name, group.first, group.second);
           aggrGroupsField.push_back(aggregationGroup);
           cout << "generated group for... " << group.first << endl;
           cout << "generated keys: ";

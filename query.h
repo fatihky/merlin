@@ -36,20 +36,24 @@ class AggregationGroup {
   public:
   vector<string> keys;
   Roaring *bitmap;
+  map<string, string> valueMap; // field > value
 
   AggregationGroup(AggregationGroup *group) {
     keys = group->keys;
+    valueMap = group->valueMap;
     bitmap = new Roaring(*group->bitmap);
   }
 
-  AggregationGroup(string initialKey, Roaring *initialBitmap) {
+  AggregationGroup(string field, string initialKey, Roaring *initialBitmap) {
     keys.push_back(initialKey);
+    valueMap[field] = initialKey;
     bitmap = new Roaring(*initialBitmap);
   }
 
-  AggregationGroup *clone(string key, Roaring *bitmap) {
+  AggregationGroup *clone(string field, string key, Roaring *bitmap) {
     auto clone = new AggregationGroup(this);
     clone->keys.push_back(key);
+    clone->valueMap[field] = key;
     *clone->bitmap &= *bitmap;
     return clone;
   }
