@@ -71,7 +71,7 @@ void Query::genAggrGroups() {
 
 void Query::genResultRows() {
   if (!isAggregationQuery) {
-    assert(0 && "non aggregation queries are not supported at the moment");
+    throw std::runtime_error("non aggregation queries are not supported at the moment");
   }
 
   for (auto &&aggrGroup : aggregationGroups) {
@@ -81,7 +81,7 @@ void Query::genResultRows() {
       if (selectExpr->isAggerationSelect) {
         if (selectExpr->aggerationFunc == "count") {
           if (selectExpr->field != "*") {
-            assert(0 && "only '*' is supported for count()");
+            throw std::runtime_error("only '*' is supported for count()");
           }
 
           cout << "[" << aggrGroup->bitmap->cardinality() << "] ";
@@ -220,7 +220,7 @@ void Query::printResultRows() {
       } else if (value->type == FIELD_TYPE_BIGINT) {
         cout << value->getUInt64Val();
       } else {
-        assert(0 && "unspported value type in result rows");
+        throw std::runtime_error("unspported value type in result rows");
       }
 
       if (i < selectExprCount - 1) {

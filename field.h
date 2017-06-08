@@ -109,7 +109,7 @@ class Field {
             }
           } break;
 
-          default: assert(0 && "unknown string encoding");
+          default: throw std::runtime_error("unknown string encoding");
         }
       } break;
       case FIELD_TYPE_BOOLEAN: {
@@ -117,7 +117,7 @@ class Field {
           storage.bvals->add((uint32_t) size);
         }
       } break;
-      default: assert(0 && "unknown field type");
+      default: throw std::runtime_error("unknown field type");
     }
 
     size++;
@@ -129,15 +129,15 @@ class Field {
         switch (encoding) {
           case FIELD_ENCODING_DICT: {
             if (op != "=") {
-              assert(0 && "unsupported operator");
+              throw std::runtime_error("unsupported operator");
             }
 
             return storage.strval.dict.dict[value];
           };
-          default: assert(0 && "unsupported string encoding");
+          default: throw std::runtime_error("unsupported string encoding");
         }
       }
-      default: assert(0 && "unsupported field type");
+      default: throw std::runtime_error("unsupported field type");
     }
 
     return nullptr;
@@ -158,10 +158,10 @@ class Field {
               result[val.first] = bitmap;
             }
           } break;
-          default: assert(0 && "unsupported string encoding");
+          default: throw std::runtime_error("unsupported string encoding");
         }
       }
-      default: assert(0 && "unsupported field type");
+      default: throw std::runtime_error("unsupported field type");
     }
 
     return result;
