@@ -101,7 +101,7 @@ void Query::genResultRows() {
           const auto sum = field->aggrFuncSum(aggrGroup->bitmap);
           cout << "[" << sum << "] ";
           row->values.push_back(new GenericValueContainer(sum));
-        } else if (selectExpr->aggerationFunc == "avg") {
+        } else if (selectExpr->aggerationFunc == "avg" || selectExpr->aggerationFunc == "mean") {
           const auto field = table->fields[selectExpr->field];
           const auto sum = field->aggrFuncSum(aggrGroup->bitmap);
           const auto avg = sum / aggrGroup->bitmap->cardinality();
