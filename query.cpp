@@ -101,6 +101,50 @@ void Query::genResultRows() {
   }
 }
 
+void Query::printResultRows() {
+  const auto selectExprCount = selectExprs.size();
+
+  for (auto i = 0UL, len = selectExprs.size(); i < len; i++) {
+    const auto selectExpr = selectExprs[i];
+
+    if (!selectExpr->display.empty()) {
+      cout << selectExpr->display;
+    } else if (!selectExpr->isAggerationSelect) {
+      cout << selectExpr->field;
+    } else {
+      cout << selectExpr->aggerationFunc << "(" << selectExpr->field << ")";
+    }
+
+    if (i < len - 1) {
+      cout << ", ";
+    }
+  }
+
+  cout << endl;
+
+  for (auto &&row : result.rows) {
+    for (auto i = 0; i < selectExprCount; i++) {
+      const auto value = row->values[i];
+
+      if (value->type == FIELD_TYPE_STRING) {
+        cout << value->getStrVal();
+      } else if (value->type == FIELD_TYPE_INT) {
+        cout << value->getIVal();
+      } else if (value->type == FIELD_TYPE_BIGINT) {
+        cout << value->getUInt64Val();
+      } else {
+        assert(0 && "unspported value type in result rows");
+      }
+
+      if (i < selectExprCount - 1) {
+        cout << ", ";
+      }
+    }
+
+    cout << endl;
+  }
+}
+
 void runQuery(Table *table) {
   auto roar = new Roaring(roaring_bitmap_from_range(0, 1000, 1));
   Query *query = new Query(table, roar);
@@ -125,4 +169,6 @@ void runQuery(Table *table) {
   query->genAggrGroups();
   // generate rows
   query->genResultRows();
+  // print result rows
+  query->printResultRows();
 }

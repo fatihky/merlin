@@ -92,6 +92,7 @@ class Query {
   void applyFilters();
   void genAggrGroups();
   void genResultRows();
+  void printResultRows();
 };
 
 void runQuery(Table *table);
