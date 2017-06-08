@@ -68,6 +68,28 @@ void Query::genAggrGroups() {
 
   aggregationGroups = result;
 }
+
+void Query::genResultRows() {
+  if (!isAggregationQuery) {
+    assert(0 && "non aggregation queries are not supported at the moment");
+  }
+
+  for (auto &&aggrGroup : aggregationGroups) {
+    auto row = new QueryResultRow();
+
+    for (auto &&selectExpr : selectExprs) {
+      if (selectExpr->isAggerationSelect) {
+        assert(0 && "aggregation selects not supported yet");
+      }
+
+      cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
+      row->values.push_back(new GenericValueContainer(aggrGroup->valueMap[selectExpr->field]));
+    }
+
+    cout << endl;
+
+    result.rows.push_back(row);
+  }
 }
 
 void runQuery(Table *table) {
@@ -76,9 +98,13 @@ void runQuery(Table *table) {
   FilterExpr *endpointMustBeHome = new FilterExpr("endpoint", "=", "/home");
   GroupByExpr *groupByExprEndpoint = new GroupByExpr("endpoint");
   GroupByExpr *groupByExprGender = new GroupByExpr("gender");
+  SelectExpr *selectExprEndpoint = new SelectExpr("endpoint");
+  SelectExpr *selectExprGender = new SelectExpr("gender");
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
   query->groupByExprs.push_back(groupByExprGender);
+  query->selectExprs.push_back(selectExprEndpoint);
+  query->selectExprs.push_back(selectExprGender);
   // apply filters
   query->applyFilters();
   cout << "after filter, bitmap: ";
@@ -87,4 +113,5 @@ void runQuery(Table *table) {
   // apply groups
   query->genAggrGroups();
   // generate rows
+  query->genResultRows();
 }

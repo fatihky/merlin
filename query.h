@@ -16,6 +16,8 @@ class SelectExpr {
   string display;
   string aggerationFunc;
   bool isAggerationSelect;
+
+  SelectExpr(string field_): field(field_), isAggerationSelect(false) {}
 };
 
 class FilterExpr {
@@ -88,6 +90,7 @@ class Query {
 
   void applyFilters();
   void genAggrGroups();
+  void genResultRows();
 };
 
 void runQuery(Table *table);
