@@ -65,6 +65,9 @@ void Query::genAggrGroups() {
 
     result = aggrGroupsField;
   }
+
+  aggregationGroups = result;
+}
 }
 
 void runQuery(Table *table) {
