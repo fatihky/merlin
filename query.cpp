@@ -128,6 +128,9 @@ void Query::applyOrder() {
   std::sort(result.rows.begin(), result.rows.end(), [&](QueryResultRow *row1, QueryResultRow *row2) {
     for (auto &&orderByExpr : query->orderByExprs) {
       const auto fieldIndex = query->findSelectFieldIndex(orderByExpr->field);
+      if (fieldIndex == -1) {
+        throw std::runtime_error("unknown field in order by: " + orderByExpr->field);
+      }
       const auto val1 = row1->values[fieldIndex];
       const auto val2 = row2->values[fieldIndex];
       cout << "order " << orderByExpr->field << " idx: " << fieldIndex << endl;
