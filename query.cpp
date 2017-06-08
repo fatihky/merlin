@@ -133,32 +133,28 @@ void Query::applyOrder() {
       }
       const auto val1 = row1->values[fieldIndex];
       const auto val2 = row2->values[fieldIndex];
-      cout << "order " << orderByExpr->field << " idx: " << fieldIndex << endl;
 
       if (val1->type == FIELD_TYPE_INT) {
         int ival1 = val1->getIVal();
         int ival2 = val2->getIVal();
-        cout << "val1: " << ival1 << " " << ival2 << " .. type = " << val1->type << " order asc " << orderByExpr->asc << endl;
 
         if (ival1 > ival2) {
-          return orderByExpr->asc ? false : true;
+          return !orderByExpr->asc;
         }
 
         if (ival1 < ival2) {
-          return orderByExpr->asc ? true : false;
+          return orderByExpr->asc;
         }
       } else if (val1->type == FIELD_TYPE_BIGINT) {
         uint64_t ival1 = val1->getUInt64Val();
         uint64_t ival2 = val2->getUInt64Val();
-        cout << "val1: " << ival1 << " " << ival2 << " .. type = " << val1->type << " order asc " << orderByExpr->asc << endl;
 
         if (ival1 > ival2) {
-          cout << "i1>i2 ret: " << (orderByExpr->asc ? 1 : -1) << endl;
-          return orderByExpr->asc ? false : true;
+          return !orderByExpr->asc;
         }
 
         if (ival1 < ival2) {
-          return orderByExpr->asc ? true : false;
+          return orderByExpr->asc;
         }
       } else {
         throw std::runtime_error("unknown value type for order by");
