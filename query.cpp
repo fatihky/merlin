@@ -109,6 +109,10 @@ int Query::findSelectFieldIndex(string field) {
       return index;
     }
 
+    if (field == selectExpr->display) {
+      return index;
+    }
+
     index++;
   }
 
