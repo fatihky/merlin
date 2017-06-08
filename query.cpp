@@ -101,6 +101,69 @@ void Query::genResultRows() {
   }
 }
 
+int Query::findSelectFieldIndex(string field) {
+  int index = 0;
+
+  for (auto &&selectExpr : selectExprs) {
+    if (field == selectExpr->field) {
+      return index;
+    }
+
+    index++;
+  }
+
+  return -1;
+}
+
+void Query::applyOrder() {
+  if (orderByExprs.size() == 0) {
+    return;
+  }
+  const auto query = this;
+
+  std::sort(result.rows.begin(), result.rows.end(), [&](QueryResultRow *row1, QueryResultRow *row2) {
+    for (auto &&orderByExpr : query->orderByExprs) {
+      const auto fieldIndex = query->findSelectFieldIndex(orderByExpr->field);
+      const auto val1 = row1->values[fieldIndex];
+      const auto val2 = row2->values[fieldIndex];
+      cout << "order " << orderByExpr->field << " idx: " << fieldIndex << endl;
+
+      if (val1->type == FIELD_TYPE_INT) {
+        int ival1 = val1->getIVal();
+        int ival2 = val2->getIVal();
+        cout << "val1: " << ival1 << " " << ival2 << " .. type = " << val1->type << " order asc " << orderByExpr->asc << endl;
+
+        if (ival1 > ival2) {
+          return orderByExpr->asc ? false : true;
+        }
+
+        if (ival1 < ival2) {
+          return orderByExpr->asc ? true : false;
+        }
+      } else if (val1->type == FIELD_TYPE_BIGINT) {
+        uint64_t ival1 = val1->getUInt64Val();
+        uint64_t ival2 = val2->getUInt64Val();
+        cout << "val1: " << ival1 << " " << ival2 << " .. type = " << val1->type << " order asc " << orderByExpr->asc << endl;
+
+        if (ival1 > ival2) {
+          cout << "i1>i2 ret: " << (orderByExpr->asc ? 1 : -1) << endl;
+          return orderByExpr->asc ? false : true;
+        }
+
+        if (ival1 < ival2) {
+          return orderByExpr->asc ? true : false;
+        }
+      } else {
+        throw std::runtime_error("unknown value type for order by");
+      }
+    }
+
+    return false;
+  });
+
+  cout << "after sort" << endl;
+}
+
 void Query::printResultRows() {
   const auto selectExprCount = selectExprs.size();
 
@@ -154,12 +217,14 @@ void runQuery(Table *table) {
   SelectExpr *selectExprEndpoint = new SelectExpr("endpoint");
   SelectExpr *selectExprGender = new SelectExpr("gender");
   SelectExpr *selectExprCount = new SelectExpr("*", "count");
+  OrderByExpr *orderByExprCount = new OrderByExpr("*");
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
   query->groupByExprs.push_back(groupByExprGender);
   query->selectExprs.push_back(selectExprEndpoint);
   query->selectExprs.push_back(selectExprGender);
   query->selectExprs.push_back(selectExprCount);
+  query->orderByExprs.push_back(orderByExprCount);
   // apply filters
   query->applyFilters();
   cout << "after filter, bitmap: ";
@@ -169,6 +234,8 @@ void runQuery(Table *table) {
   query->genAggrGroups();
   // generate rows
   query->genResultRows();
+  // apply order
+  query->applyOrder();
   // print result rows
   query->printResultRows();
 }

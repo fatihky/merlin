@@ -35,6 +35,14 @@ class GroupByExpr {
   GroupByExpr(string field_): field(field_) {}
 };
 
+class OrderByExpr {
+  public:
+  string field;
+  bool asc;
+
+  OrderByExpr(string field_, bool asc_ = false): field(field_), asc(asc_) {}
+};
+
 class AggregationGroup {
   public:
   vector<string> keys;
@@ -77,6 +85,7 @@ class Query {
   vector<SelectExpr *> selectExprs;
   vector<FilterExpr *> filterExprs;
   vector<GroupByExpr *> groupByExprs;
+  vector<OrderByExpr *> orderByExprs;
   vector<AggregationGroup *> aggregationGroups;
   bool isAggregationQuery;
   QueryResult result;
@@ -92,7 +101,11 @@ class Query {
   void applyFilters();
   void genAggrGroups();
   void genResultRows();
+  void applyOrder();
   void printResultRows();
+
+  private:
+  int findSelectFieldIndex(string field);
 };
 
 void runQuery(Table *table);
