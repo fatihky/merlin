@@ -79,16 +79,21 @@ void Query::genResultRows() {
 
     for (auto &&selectExpr : selectExprs) {
       if (selectExpr->isAggerationSelect) {
-        if (selectExpr->aggerationFunc != "count") {
-          assert(0 && "only count aggregation function is supported at the moment");
-        }
+        if (selectExpr->aggerationFunc == "count") {
+          if (selectExpr->field != "*") {
+            assert(0 && "only '*' is supported for count()");
+          }
 
-        if (selectExpr->field != "*") {
-          assert(0 && "only '*' is supported for count()");
+          cout << "[" << aggrGroup->bitmap->cardinality() << "] ";
+          row->values.push_back(new GenericValueContainer(aggrGroup->bitmap->cardinality()));
+        } else if (selectExpr->aggerationFunc == "min") {
+          const auto field = table->fields[selectExpr->field];
+          const auto min = field->aggrFuncMin(aggrGroup->bitmap);
+          cout << "[" << min << "] ";
+          row->values.push_back(new GenericValueContainer(min));
+        } else {
+          throw std::runtime_error("unknown aggregation function: " + selectExpr->aggerationFunc + " -- " + (selectExpr->aggerationFunc == "count" ? "true" : "false"));
         }
-
-        cout << "[" << aggrGroup->bitmap->cardinality() << "] ";
-        row->values.push_back(new GenericValueContainer(aggrGroup->bitmap->cardinality()));
       } else {
         cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
         row->values.push_back(new GenericValueContainer(aggrGroup->valueMap[selectExpr->field]));
@@ -220,6 +225,7 @@ void runQuery(Table *table) {
   SelectExpr *selectExprEndpoint = new SelectExpr("endpoint");
   SelectExpr *selectExprGender = new SelectExpr("gender");
   SelectExpr *selectExprCount = new SelectExpr("*", "count", "count");
+  SelectExpr *selectExprMinResponseTime = new SelectExpr("responseTime", "min", "min(responseTime)");
   OrderByExpr *orderByExprCount = new OrderByExpr("count");
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
@@ -227,6 +233,7 @@ void runQuery(Table *table) {
   query->selectExprs.push_back(selectExprEndpoint);
   query->selectExprs.push_back(selectExprGender);
   query->selectExprs.push_back(selectExprCount);
+  query->selectExprs.push_back(selectExprMinResponseTime);
   query->orderByExprs.push_back(orderByExprCount);
   // apply filters
   query->applyFilters();

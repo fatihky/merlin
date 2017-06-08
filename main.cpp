@@ -44,7 +44,7 @@ int main() {
   const auto fieldEndpoint = new Field("endpoint", FIELD_TYPE_STRING);
   const auto fieldGender = new Field("gender", FIELD_TYPE_STRING);
   const auto fieldReferrer = new Field("referrer", FIELD_TYPE_STRING);
-  const auto fieldResponseTime = new Field("responseTime", FIELD_TYPE_TIMESTAMP);
+  const auto fieldResponseTime = new Field("responseTime", FIELD_TYPE_INT);
 
   fieldEndpoint->setEncoding(FIELD_ENCODING_DICT);
   fieldGender->setEncoding(FIELD_ENCODING_DICT);

@@ -14,6 +14,15 @@
 
 using namespace std;
 
+class Field;
+
+struct aggr_func_min_data {
+  uint64_t min;
+  Field *field;
+};
+
+static bool aggrFuncMinInt(uint32_t value, void *data);
+
 class Field {
   public:
   string name;
@@ -145,6 +154,35 @@ class Field {
 
     return result;
   };
+
+  uint64_t aggrFuncMin(Roaring *bitmap) {
+    const auto field = this;
+    uint64_t min = UINT64_MAX;
+    const aggr_func_min_data ctx = {
+      .min = UINT64_MAX,
+      .field = this
+    };
+
+    if (type != FIELD_TYPE_INT) {
+      throw std::runtime_error("only int fields supported by min()");
+    }
+
+    bitmap->iterate(aggrFuncMinInt, (void *) &ctx);
+
+    return ctx.min;
+  }
 };
+
+
+static bool aggrFuncMinInt(uint32_t value, void *data) {
+  const auto ctx = (aggr_func_min_data *) data;
+  const auto ival = ctx->field->storage.ivals[value];
+
+  if (ival < ctx->min) {
+    ctx->min = (uint64_t) ival;
+  }
+
+  return true;
+}
 
 #endif //MERLIN_FIELD_H
