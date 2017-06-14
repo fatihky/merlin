@@ -160,7 +160,7 @@ class Field {
           } break;
           default: throw std::runtime_error("field \"" + name + "\": unsupported string encoding " + to_string(encoding) + " for group by.");
         }
-      }
+      } break;
       default: throw std::runtime_error("field \"" + name + "\": unsupported field type " + to_string(type) + " for group by.");
     }
 
