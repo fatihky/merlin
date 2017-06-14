@@ -1,3 +1,6 @@
 [submodule "deps/CRoaring"]
 	path = deps/CRoaring
 	url = git@github.com:RoaringBitmap/CRoaring
+[submodule "deps/fastrange"]
+	path = deps/fastrange
+	url = git@github.com:lemire/fastrange.git

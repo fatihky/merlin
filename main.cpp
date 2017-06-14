@@ -13,8 +13,8 @@
 
 using namespace std;
 
-void insertRow(Table *table, int timestamp, string referrer, string endpoint, string gender, int responseTime) {
-  table->fields["timestamp"]->addValue(GenericValueContainer((int64_t) timestamp));
+void insertRow(Table *table, int64_t timestamp, string referrer, string endpoint, string gender, int responseTime) {
+  table->fields["timestamp"]->addValue(GenericValueContainer(timestamp));
   table->fields["endpoint"]->addValue(GenericValueContainer(endpoint));
   table->fields["referrer"]->addValue(GenericValueContainer(referrer));
   table->fields["gender"]->addValue(GenericValueContainer(gender));

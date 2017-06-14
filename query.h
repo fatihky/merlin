@@ -15,7 +15,10 @@ class SelectExpr {
   string field;
   string display;
   string aggerationFunc;
+  vector<string> aggerationFuncArgs;
   bool isAggerationSelect;
+  // this is for dateSecondsGroup function currently
+  map<string, Roaring *> groups;
 
   SelectExpr(string field_): field(field_), isAggerationSelect(false) {}
   SelectExpr(string field_, string aggerationFunc_): field(field_), aggerationFunc(aggerationFunc_), isAggerationSelect(true) {}
@@ -107,6 +110,7 @@ class Query {
 
   private:
   int findSelectFieldIndex(string field);
+  SelectExpr *findSelectExprByDisplayValue(string displayValue);
 };
 
 void runQuery(Table *table);

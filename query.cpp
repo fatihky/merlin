@@ -22,14 +22,31 @@ void Query::applyFilters() {
   filterResult = result;
 }
 
+SelectExpr *Query::findSelectExprByDisplayValue(string displayValue) {
+  for (auto &&selectExpr : selectExprs) {
+    if (selectExpr->display == displayValue) {
+      return selectExpr;
+    }
+  }
+
+  return nullptr;
+}
+
 void Query::genAggrGroups() {
   vector<AggregationGroup *> result;
   for (auto &&groupByExpr : groupByExprs) {
-    const auto field = table->fields[groupByExpr->field];
+    const auto isAggerationGroupBy = table->fields.count(groupByExpr->field) == 0;
+    const auto aggrSelectExpr = findSelectExprByDisplayValue(groupByExpr->field);
+    const auto field = isAggerationGroupBy
+                       ? table->fields[aggrSelectExpr->field]
+                       : table->fields[groupByExpr->field];
+
     // const auto keys = field->keys();
     if (result.size() == 0) {
       vector<AggregationGroup *> aggrGroupsField;
-      const auto groups = field->genGroups(initialBitmap);
+      const auto groups = isAggerationGroupBy
+                          ? field->genGroups(initialBitmap, aggrSelectExpr->aggerationFunc, aggrSelectExpr->aggerationFuncArgs)
+                          : field->genGroups(initialBitmap);
       for (auto &&group : groups) {
         const auto aggregationGroup = new AggregationGroup(field->name, group.first, group.second);
         aggrGroupsField.push_back(aggregationGroup);
@@ -38,18 +55,24 @@ void Query::genAggrGroups() {
         cout << endl;
       }
       result = aggrGroupsField;
+
+      if (isAggerationGroupBy) {
+        aggrSelectExpr->groups = std::move(groups);
+      }
       continue;
     }
 
     vector<AggregationGroup *> aggrGroupsField;
     for (auto &&groupByGroup : result) {
-      cout << "generate new groups for key ";
+      cout << endl << "generate new groups for key ";
       dumpStrVector(groupByGroup->keys);
       cout << endl;
 
       for (unsigned long i = 0, size = groupByGroup->keys.size(); i < size; ++i) {
         const auto currentBitmap = groupByGroup->bitmap;
-        const auto groups = field->genGroups(currentBitmap);
+        const auto groups = isAggerationGroupBy
+                            ? field->genGroups(currentBitmap, aggrSelectExpr->aggerationFunc, aggrSelectExpr->aggerationFuncArgs)
+                            : field->genGroups(currentBitmap);
         for (auto &&group : groups) {
           const auto aggregationGroup = groupByGroup->clone(field->name, group.first, group.second);
           aggrGroupsField.push_back(aggregationGroup);
@@ -59,6 +82,10 @@ void Query::genAggrGroups() {
           cout << " | bitmap: ";
           aggregationGroup->bitmap->printf();
           cout << endl;
+        }
+
+        if (isAggerationGroupBy) {
+          aggrSelectExpr->groups = std::move(groups);
         }
       }
     }
@@ -107,6 +134,9 @@ void Query::genResultRows() {
           const auto avg = sum / aggrGroup->bitmap->cardinality();
           cout << "[" << avg << "] ";
           row->values.push_back(new GenericValueContainer(avg));
+        } else if (selectExpr->aggerationFunc == "dateSecondsGroup") {
+          cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
+          row->values.push_back(new GenericValueContainer(aggrGroup->valueMap[selectExpr->field]));
         } else {
           throw std::runtime_error("unknown aggregation function: " + selectExpr->aggerationFunc + " -- " + (selectExpr->aggerationFunc == "count" ? "true" : "false"));
         }
@@ -238,6 +268,7 @@ void runQuery(Table *table) {
   FilterExpr *endpointMustBeHome = new FilterExpr("endpoint", "=", "/home");
   GroupByExpr *groupByExprEndpoint = new GroupByExpr("endpoint");
   GroupByExpr *groupByExprGender = new GroupByExpr("gender");
+  GroupByExpr *groupByExprTimestamp3Secs = new GroupByExpr("dateSecondsGroup(timestamp, 3)");
   SelectExpr *selectExprEndpoint = new SelectExpr("endpoint");
   SelectExpr *selectExprGender = new SelectExpr("gender");
   SelectExpr *selectExprCount = new SelectExpr("*", "count", "count");
@@ -245,11 +276,15 @@ void runQuery(Table *table) {
   SelectExpr *selectExprMaxResponseTime = new SelectExpr("responseTime", "max", "max(responseTime)");
   SelectExpr *selectExprSumResponseTime = new SelectExpr("responseTime", "sum", "sum(responseTime)");
   SelectExpr *selectExprAvgResponseTime = new SelectExpr("responseTime", "avg", "avg(responseTime)");
+  SelectExpr *selectExprBy3Secs = new SelectExpr("timestamp", "dateSecondsGroup", "dateSecondsGroup(timestamp, 3)");
   OrderByExpr *orderByExprCount = new OrderByExpr("count");
+  selectExprBy3Secs->aggerationFuncArgs.push_back("3");
   query->isAggregationQuery = true;
   query->filterExprs.push_back(endpointMustBeHome);
+  query->groupByExprs.push_back(groupByExprTimestamp3Secs);
   query->groupByExprs.push_back(groupByExprEndpoint);
   query->groupByExprs.push_back(groupByExprGender);
+  query->selectExprs.push_back(selectExprBy3Secs);
   query->selectExprs.push_back(selectExprEndpoint);
   query->selectExprs.push_back(selectExprGender);
   query->selectExprs.push_back(selectExprCount);

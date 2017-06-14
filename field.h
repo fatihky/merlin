@@ -5,7 +5,9 @@
 #include <string>
 #include <vector>
 #include <map>
+#include <stdlib.h>
 #include "deps/CRoaring/cpp/roaring.hh"
+#include "deps/fastrange/fastrange.h"
 #include "field-types.h"
 #include "generic-value.h"
 
@@ -31,9 +33,16 @@ struct aggr_func_sum_data {
   Field *field;
 };
 
+struct aggr_func_date_seconds_group_data {
+  int64_t seconds;
+  map<int64_t, Roaring *> &result;
+  Field *field;
+};
+
 static bool aggrFuncMinInt(uint32_t value, void *data);
 static bool aggrFuncMaxInt(uint32_t value, void *data);
 static bool aggrFuncSumInt(uint32_t value, void *data);
+static bool aggrFuncDateSecondsGroup(uint32_t value, void *data);
 
 class Field {
   public:
@@ -147,6 +156,14 @@ class Field {
     map<string, Roaring *> result;
 
     switch (type) {
+      case FIELD_TYPE_TIMESTAMP: {
+        // generate groups for given seconds.
+        // merge generated bitmaps with initial bitmap.
+        // return result.
+
+        // first get grouping seconds
+        // iterate over initial bitmap's results' timestamps
+      } break;
       case FIELD_TYPE_STRING: {
         switch (encoding) {
           case FIELD_ENCODING_DICT: {
@@ -166,6 +183,35 @@ class Field {
 
     return result;
   };
+
+  map<string, Roaring *> genGroups(Roaring *initialBitmap, string func, vector<string> funcArgs) {
+    map<string, Roaring *> result;
+    map<int64_t, Roaring *> intResult;
+
+    if (type != FIELD_TYPE_TIMESTAMP) {
+      throw std::runtime_error("field \"" + name + "\" has invalid field type " + to_string(type) + "aggr functions on select only supported for timestamp fields.");
+    }
+
+    if (func != "dateSecondsGroup") {
+      throw std::runtime_error("only dateSecondsGroup function is supported at the moment");
+    }
+
+    const auto cStr = funcArgs[0].c_str();
+    const int64_t secs = strtoll(cStr, nullptr, 10);
+    const aggr_func_date_seconds_group_data aggrResult = {
+      .seconds = secs,
+      .field = this,
+      .result = intResult
+    };
+
+    initialBitmap->iterate(aggrFuncDateSecondsGroup, (void *) &aggrResult);
+
+    for (auto &&timeStamp : aggrResult.result) {
+      result[to_string(timeStamp.first)] = timeStamp.second;
+    }
+
+    return result;
+  }
 
   uint64_t aggrFuncMin(Roaring *bitmap) {
     const auto field = this;
@@ -246,6 +292,24 @@ static bool aggrFuncSumInt(uint32_t value, void *data) {
 
   ctx->sum += ival;
 
+  return true;
+}
+
+static bool aggrFuncDateSecondsGroup(uint32_t value, void *data) {
+  const auto *ctx = (aggr_func_date_seconds_group_data *) data;
+  const auto timestamp = ctx->field->storage.timestamps[value - 1];
+  //  const int64_t group = timestamp - (int64_t) fastrange64((uint64_t) timestamp, (uint64_t) ctx->seconds);
+  const int64_t group = timestamp - (timestamp % ctx->seconds);
+  Roaring *roar = nullptr;
+
+  if (ctx->result.count(group) == 1) {
+    roar = ctx->result[group];
+  } else {
+    roar = new Roaring();
+    ctx->result[group] = roar;
+  }
+
+  roar->add(value);
   return true;
 }
 
