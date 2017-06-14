@@ -158,10 +158,10 @@ class Field {
               result[val.first] = bitmap;
             }
           } break;
-          default: throw std::runtime_error("unsupported string encoding");
+          default: throw std::runtime_error("field \"" + name + "\": unsupported string encoding " + to_string(encoding) + " for group by.");
         }
       }
-      default: throw std::runtime_error("unsupported field type");
+      default: throw std::runtime_error("field \"" + name + "\": unsupported field type " + to_string(type) + " for group by.");
     }
 
     return result;
