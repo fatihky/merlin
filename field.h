@@ -136,7 +136,7 @@ class Field {
           };
           default: throw std::runtime_error("unsupported string encoding");
         }
-      }
+      } break;
       default: throw std::runtime_error("unsupported field type");
     }
 
