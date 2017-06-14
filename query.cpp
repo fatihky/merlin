@@ -207,6 +207,15 @@ void Query::applyOrder() {
         if (ival1 < ival2) {
           return orderByExpr->asc;
         }
+      } else if (val1->type == FIELD_TYPE_STRING) {
+        const auto strVal1 = val1->getStrVal();
+        const auto strVal2 = val2->getStrVal();
+        const auto compareResult = strVal1.compare(strVal2);
+        if (compareResult > 0) {
+          return !orderByExpr->asc;
+        } else if (compareResult < 0) {
+          return orderByExpr->asc;
+        }
       } else {
         throw std::runtime_error("unknown value type for order by");
       }
@@ -277,6 +286,7 @@ void runQuery(Table *table) {
   SelectExpr *selectExprSumResponseTime = new SelectExpr("responseTime", "sum", "sum(responseTime)");
   SelectExpr *selectExprAvgResponseTime = new SelectExpr("responseTime", "avg", "avg(responseTime)");
   SelectExpr *selectExprBy3Secs = new SelectExpr("timestamp", "dateSecondsGroup", "dateSecondsGroup(timestamp, 3)");
+  OrderByExpr *orderByExprTimestamp = new OrderByExpr("dateSecondsGroup(timestamp, 3)");
   OrderByExpr *orderByExprCount = new OrderByExpr("count");
   selectExprBy3Secs->aggerationFuncArgs.push_back("3");
   query->isAggregationQuery = true;
@@ -292,6 +302,7 @@ void runQuery(Table *table) {
   query->selectExprs.push_back(selectExprMaxResponseTime);
   query->selectExprs.push_back(selectExprSumResponseTime);
   query->selectExprs.push_back(selectExprAvgResponseTime);
+  query->orderByExprs.push_back(orderByExprTimestamp);
   query->orderByExprs.push_back(orderByExprCount);
   // apply filters
   query->applyFilters();
