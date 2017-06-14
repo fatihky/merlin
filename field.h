@@ -81,7 +81,7 @@ class Field {
   }
 
   void addValue(const GenericValueContainer &genericValueContainer) {
-    assert(genericValueContainer.type === type);
+    assert(genericValueContainer.type == type);
 
     switch (type) {
       case FIELD_TYPE_TIMESTAMP: {
