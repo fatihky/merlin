@@ -246,6 +246,7 @@ void runQuery(Table *table) {
   SelectExpr *selectExprSumResponseTime = new SelectExpr("responseTime", "sum", "sum(responseTime)");
   SelectExpr *selectExprAvgResponseTime = new SelectExpr("responseTime", "avg", "avg(responseTime)");
   OrderByExpr *orderByExprCount = new OrderByExpr("count");
+  query->isAggregationQuery = true;
   query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprEndpoint);
   query->groupByExprs.push_back(groupByExprGender);
