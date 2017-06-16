@@ -272,35 +272,35 @@ void Query::printResultRows() {
 }
 
 void runQuery(Table *table) {
-  auto roar = new Roaring(roaring_bitmap_from_range(0, 1000, 1));
+  auto roar = new Roaring(roaring_bitmap_from_range(1, 7, 1));
   Query *query = new Query(table, roar);
-  FilterExpr *endpointMustBeHome = new FilterExpr("endpoint", "=", "/home");
+//  FilterExpr *endpointMustBeHome = new FilterExpr("endpoint", "=", "/home");
   GroupByExpr *groupByExprEndpoint = new GroupByExpr("endpoint");
-  GroupByExpr *groupByExprGender = new GroupByExpr("gender");
+//  GroupByExpr *groupByExprGender = new GroupByExpr("gender");
   GroupByExpr *groupByExprTimestamp3Secs = new GroupByExpr("dateSecondsGroup(timestamp, 3)");
   SelectExpr *selectExprEndpoint = new SelectExpr("endpoint");
-  SelectExpr *selectExprGender = new SelectExpr("gender");
+//  SelectExpr *selectExprGender = new SelectExpr("gender");
   SelectExpr *selectExprCount = new SelectExpr("*", "count", "count");
-  SelectExpr *selectExprMinResponseTime = new SelectExpr("responseTime", "min", "min(responseTime)");
-  SelectExpr *selectExprMaxResponseTime = new SelectExpr("responseTime", "max", "max(responseTime)");
-  SelectExpr *selectExprSumResponseTime = new SelectExpr("responseTime", "sum", "sum(responseTime)");
+//  SelectExpr *selectExprMinResponseTime = new SelectExpr("responseTime", "min", "min(responseTime)");
+//  SelectExpr *selectExprMaxResponseTime = new SelectExpr("responseTime", "max", "max(responseTime)");
+//  SelectExpr *selectExprSumResponseTime = new SelectExpr("responseTime", "sum", "sum(responseTime)");
   SelectExpr *selectExprAvgResponseTime = new SelectExpr("responseTime", "avg", "avg(responseTime)");
   SelectExpr *selectExprBy3Secs = new SelectExpr("timestamp", "dateSecondsGroup", "dateSecondsGroup(timestamp, 3)");
   OrderByExpr *orderByExprTimestamp = new OrderByExpr("dateSecondsGroup(timestamp, 3)");
   OrderByExpr *orderByExprCount = new OrderByExpr("count");
   selectExprBy3Secs->aggerationFuncArgs.push_back("3");
   query->isAggregationQuery = true;
-  query->filterExprs.push_back(endpointMustBeHome);
+//  query->filterExprs.push_back(endpointMustBeHome);
   query->groupByExprs.push_back(groupByExprTimestamp3Secs);
   query->groupByExprs.push_back(groupByExprEndpoint);
-  query->groupByExprs.push_back(groupByExprGender);
+//  query->groupByExprs.push_back(groupByExprGender);
   query->selectExprs.push_back(selectExprBy3Secs);
   query->selectExprs.push_back(selectExprEndpoint);
-  query->selectExprs.push_back(selectExprGender);
+//  query->selectExprs.push_back(selectExprGender);
   query->selectExprs.push_back(selectExprCount);
-  query->selectExprs.push_back(selectExprMinResponseTime);
-  query->selectExprs.push_back(selectExprMaxResponseTime);
-  query->selectExprs.push_back(selectExprSumResponseTime);
+//  query->selectExprs.push_back(selectExprMinResponseTime);
+//  query->selectExprs.push_back(selectExprMaxResponseTime);
+//  query->selectExprs.push_back(selectExprSumResponseTime);
   query->selectExprs.push_back(selectExprAvgResponseTime);
   query->orderByExprs.push_back(orderByExprTimestamp);
   query->orderByExprs.push_back(orderByExprCount);
