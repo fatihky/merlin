@@ -3,10 +3,15 @@
 #include <uWS/uWS.h>
 #include "rapidjson/rapidjson.h"
 #include "rapidjson/document.h"
+#include "rapidjson/writer.h"
+#include "rapidjson/stringbuffer.h"
 
 using namespace std;
 
-typedef void (*CommandHandlerFunc) (uWS::HttpResponse *res, uWS::HttpRequest &req, rapidjson::Document &doc);
+// return values:
+// true: send response document to the client
+// false: do not send anything, handler already sent custom response
+typedef bool (*CommandHandlerFunc) (uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, rapidjson::Document &req, rapidjson::Document &res);
 
 struct MerlinHttpServer {
   map<string, CommandHandlerFunc> commandHandlers;
@@ -16,7 +21,7 @@ struct MerlinHttpServer {
 static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, rapidjson::Document &doc);
 
 // command handlers
-static void commandPing(uWS::HttpResponse *res, uWS::HttpRequest &req, rapidjson::Document &doc);
+static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, rapidjson::Document &req, rapidjson::Document &res);
 
 // global server context
 static MerlinHttpServer httpServer = {};
@@ -45,10 +50,19 @@ void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_
     return;
   }
 
+  rapidjson::Document responseDocument;
+  responseDocument.SetObject();
+
   const auto cmd = document["command"].GetString();
   const auto handler = httpServer.commandHandlers[cmd];
+  const auto sendResponseDocument = handler(res, req, document, responseDocument);
 
-  handler(res, req, document);
+  if (sendResponseDocument) {
+    rapidjson::StringBuffer buffer;
+    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
+    responseDocument.Accept(writer);
+    res->end(buffer.GetString(), buffer.GetLength());
+  }
 }
 
 static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, rapidjson::Document &doc) {
@@ -66,6 +80,8 @@ static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, r
   return true;
 }
 
-static void commandPing(uWS::HttpResponse *res, uWS::HttpRequest &req, rapidjson::Document &doc) {
-  res->end("{\"pong\": true}", 14);
+static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, rapidjson::Document &req, rapidjson::Document &res) {
+  rapidjson::Document::AllocatorType& allocator = res.GetAllocator();
+  res.AddMember("pong", true, allocator);
+  return true;
 }
