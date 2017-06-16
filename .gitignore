@@ -3,7 +3,6 @@
 # third party dependencies
 /deps/CRoaring
 /deps/fastrange
-/deps/json
 
 # build dir
 build/
