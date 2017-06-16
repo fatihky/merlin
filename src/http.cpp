@@ -1,27 +1,24 @@
 #include <iostream>
 #include <map>
 #include <uWS/uWS.h>
-#include "rapidjson/rapidjson.h"
-#include "rapidjson/document.h"
-#include "rapidjson/writer.h"
-#include "rapidjson/stringbuffer.h"
+#include "picojson.h"
 
 using namespace std;
 
 // return values:
 // true: send response document to the client
 // false: do not send anything, handler already sent custom response
-typedef bool (*CommandHandlerFunc) (uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, rapidjson::Document &req, rapidjson::Document &res);
+typedef bool (*CommandHandlerFunc) (uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 
 struct MerlinHttpServer {
   map<string, CommandHandlerFunc> commandHandlers;
 };
 
 // request validator
-static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, rapidjson::Document &doc);
+static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, picojson::object &doc);
 
 // command handlers
-static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, rapidjson::Document &req, rapidjson::Document &res);
+static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 
 // global server context
 static MerlinHttpServer httpServer = {};
@@ -39,40 +36,44 @@ void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_
     return res->end("no request body found", 21);
   }
 
-  rapidjson::Document document;
-  document.Parse(data, length);
+  picojson::value documentWrap;
+  string parseErr;
+  picojson::parse(documentWrap, data, data + length, &parseErr);
 
-  if (!document.IsObject()) {
+  if (!parseErr.empty()) {
+    return res->end("json is not valid", 16);
+  }
+
+  if (!documentWrap.is<picojson::object>()) {
     return res->end("a valid json object is required as request body", 47);
   }
 
-  if (!validateRequestBody(res, req, document)) {
+  if (!validateRequestBody(res, req, documentWrap.get<picojson::object>())) {
     return;
   }
 
-  rapidjson::Document responseDocument;
-  responseDocument.SetObject();
+  picojson::object responseDocument;
 
-  const auto cmd = document["command"].GetString();
+  const string cmd = documentWrap.get("command").to_str();
   const auto handler = httpServer.commandHandlers[cmd];
-  const auto sendResponseDocument = handler(res, req, document, responseDocument);
+  const auto sendResponseDocument = handler(res, req, documentWrap.get<picojson::object>(), responseDocument);
 
   if (sendResponseDocument) {
-    rapidjson::StringBuffer buffer;
-    rapidjson::Writer<rapidjson::StringBuffer> writer(buffer);
-    responseDocument.Accept(writer);
-    res->end(buffer.GetString(), buffer.GetLength());
+    const auto responseString = picojson::value(responseDocument).serialize();
+    res->end(responseString.c_str(), responseString.size());
   }
 }
 
-static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, rapidjson::Document &doc) {
-  if (!doc["command"].IsString()) {
+static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, picojson::object &doc) {
+  auto command = doc["command"];
+
+  if (!command.is<string>()) {
     res->end("command property is required", 28);
     return false;
   }
 
   // check whether command is valid
-  if (httpServer.commandHandlers.count(doc["command"].GetString()) == 0) {
+  if (httpServer.commandHandlers.count(doc["command"].to_str()) == 0) {
     res->end("invalid command", 15);
     return false;
   }
@@ -80,8 +81,7 @@ static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, r
   return true;
 }
 
-static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, rapidjson::Document &req, rapidjson::Document &res) {
-  rapidjson::Document::AllocatorType& allocator = res.GetAllocator();
-  res.AddMember("pong", true, allocator);
+static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  res["pong"] = picojson::value(true);
   return true;
 }
