@@ -4,3 +4,6 @@
 [submodule "deps/fastrange"]
 	path = deps/fastrange
 	url = git@github.com:lemire/fastrange.git
+[submodule "deps/rapidjson"]
+	path = deps/rapidjson
+	url = git@github.com:miloyip/rapidjson.git

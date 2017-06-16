@@ -3,6 +3,7 @@
 #include <map>
 #include <vector>
 #include <cassert>
+#include <uWS/uWS.h>
 #include "roaring.hh"
 #include "query.h"
 #include "field.h"
@@ -10,8 +11,12 @@
 #include "generic-value.h"
 #include "table.h"
 #include "query.h"
+#include "http.h"
+#include "server.h"
 
 using namespace std;
+
+MerlinServer server;
 
 void insertRow(Table *table, int64_t timestamp, string referrer, string endpoint, string gender, int responseTime) {
   table->fields["timestamp"]->addValue(GenericValueContainer(timestamp));
@@ -39,6 +44,8 @@ void insertRows(Table *table) {
 int main() {
   std::cout << "Hello, World!" << std::endl;
 
+  uWS::Hub h;
+
   const auto table = new Table();
   const auto fieldTimestamp = new Field("timestamp", FIELD_TYPE_TIMESTAMP);
   const auto fieldEndpoint = new Field("endpoint", FIELD_TYPE_STRING);
@@ -59,6 +66,14 @@ int main() {
   insertRows(table);
 
   runQuery(table);
+
+  // start http server
+  httpServerInit();
+
+  h.onHttpRequest(httpHandler);
+
+  h.listen(3000);
+  h.run();
 
   delete fieldTimestamp;
   delete fieldEndpoint;
