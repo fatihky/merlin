@@ -2,6 +2,7 @@
 #include <map>
 #include <uWS/uWS.h>
 #include "picojson.h"
+#include "server.h"
 
 using namespace std;
 
@@ -19,12 +20,14 @@ static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, p
 
 // command handlers
 static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 
 // global server context
 static MerlinHttpServer httpServer = {};
 
 void httpServerInit() {
   httpServer.commandHandlers["ping"] = commandPing;
+  httpServer.commandHandlers["show_tables"] = commandShowTables;
 }
 
 void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
@@ -83,5 +86,17 @@ static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, p
 
 static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
   res["pong"] = picojson::value(true);
+  return true;
+}
+
+static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  picojson::array tableNames;
+
+  for (auto &&tableIter : server.tables) {
+    tableNames.push_back(picojson::value(tableIter.first));
+  }
+
+  res["tables"] = picojson::value(tableNames);
+
   return true;
 }
