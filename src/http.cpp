@@ -1,9 +1,17 @@
 #include <iostream>
 #include <map>
 #include <uWS/uWS.h>
-#include "picojson.h"
 #include "table.h"
 #include "field.h"
+
+// picojson and roaring bitmap both declares this
+// but picojson does does not check whether this
+// constant is defined
+#ifdef __STDC_FORMAT_MACROS
+#  undef __STDC_FORMAT_MACROS
+#endif
+#define PICOJSON_USE_INT64
+#include "picojson.h"
 
 using namespace std;
 
@@ -26,6 +34,7 @@ static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
 static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 
 // global server context
 static MerlinHttpServer httpServer = {
@@ -56,6 +65,7 @@ void httpServerInit() {
   httpServer.commandHandlers["create_table"] = commandCreateTable;
   httpServer.commandHandlers["describe_table"] = commandDescribeTable;
   httpServer.commandHandlers["drop_table"] = commandDropTable;
+  httpServer.commandHandlers["insert_into_table"] = commandInsertIntoTable;
 }
 
 void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
@@ -276,6 +286,71 @@ static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpR
   res["dropped"] = picojson::value(true);
 
   return true;
+}
+
+static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  picojson::array fields;
+  string tableName;
+  string err;
+  auto rows = req["rows"];
+
+  if (!req["name"].is<string>()) {
+    return setError(res, "name prop is required");
+  }
+
+  if (!rows.is<picojson::array>()) {
+    return setError(res, "rows prop must be an array");
+  }
+
+  tableName = req["name"].to_str();
+
+  if (httpServer.tables.count(tableName) == 0) {
+    return setError(res, "table not found");
+  }
+
+  const Table *table = httpServer.tables[tableName];
+
+  for (auto &&row : rows.get<picojson::array>()) {
+    if (!row.is<picojson::object>()) {
+      err = "each row must be an object";
+      goto error;
+    }
+
+    picojson::object obj = row.get<picojson::object>();
+
+    for (auto &&fieldIter : table->fields) {
+      auto field = fieldIter.second;
+      auto value = obj[field->name];
+      if (value.is<double>()) {
+        if (field->type == FIELD_TYPE_TIMESTAMP) {
+          field->addValue(std::move(GenericValueContainer(value.get<int64_t>())));
+        } else if (field->type == FIELD_TYPE_INT) {
+          field->addValue(std::move(GenericValueContainer((int) value.get<int64_t>())));
+        } else {
+          err = "invalid value type for field: " + field->name;
+          goto error;
+        }
+      } else if (value.is<string>()) {
+        if (field->type == FIELD_TYPE_STRING) {
+          field->addValue(std::move(GenericValueContainer(value.to_str())));
+        } else {
+          err = "invalid value type for field: " + field->name;
+          goto error;
+        }
+      } else {
+        err = "invalid value type for field: " + field->name;
+        goto error;
+      }
+    }
+
+  }
+
+  res["inserted"] = picojson::value(true);
+
+  return true;
+
+  error:
+    return setError(res, err);
 }
 
 int main() {
