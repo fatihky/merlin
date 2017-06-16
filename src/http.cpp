@@ -24,6 +24,7 @@ static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, p
 static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 
 // global server context
 static MerlinHttpServer httpServer = {
@@ -37,11 +38,22 @@ map<string, int> fieldTypes = {
 map<string, int> encodingTypes = {
   {"dict", FIELD_ENCODING_DICT}
 };
+map<int, string> fieldTypeToStr = {
+  {FIELD_TYPE_TIMESTAMP, "timestamp"},
+  {FIELD_TYPE_STRING, "string"},
+  {FIELD_TYPE_INT, "int"}
+};
+map<int, string> encodingTypeToStr = {
+  {FIELD_ENCODING_NONE, "none"},
+  {FIELD_ENCODING_DICT, "dict"},
+  {FIELD_ENCODING_MULTI_VAL, "multi_val"}
+};
 
 void httpServerInit() {
   httpServer.commandHandlers["ping"] = commandPing;
   httpServer.commandHandlers["show_tables"] = commandShowTables;
   httpServer.commandHandlers["create_table"] = commandCreateTable;
+  httpServer.commandHandlers["describe_table"] = commandDescribeTable;
 }
 
 void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
@@ -206,6 +218,38 @@ static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &htt
 
   error:
     return setError(res, err);
+}
+
+static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  picojson::array fields;
+  string tableName;
+
+  if (!req["name"].is<string>()) {
+    return setError(res, "name prop is required");
+  }
+
+  tableName = req["name"].to_str();
+
+  if (httpServer.tables.count(tableName) == 0) {
+    return setError(res, "table not found");
+  }
+
+  const Table *table = httpServer.tables[tableName];
+
+  for (auto &&iter : table->fields) {
+    const auto field = iter.second;
+    picojson::object obj;
+
+    obj["name"] = picojson::value(field->name);
+    obj["type"] = picojson::value(fieldTypeToStr[field->type]);
+    obj["encoding"] = picojson::value(encodingTypeToStr[field->encoding]);
+
+    fields.push_back(picojson::value(obj));
+  }
+
+  res["fields"] = picojson::value(fields);
+
+  return true;
 }
 
 int main() {
