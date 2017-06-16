@@ -2,7 +2,7 @@
 #include <map>
 #include <uWS/uWS.h>
 #include "picojson.h"
-#include "server.h"
+#include "table.h"
 
 using namespace std;
 
@@ -13,6 +13,7 @@ typedef bool (*CommandHandlerFunc) (uWS::HttpResponse *httpRes, uWS::HttpRequest
 
 struct MerlinHttpServer {
   map<string, CommandHandlerFunc> commandHandlers;
+  map<string, Table *> tables;
 };
 
 // request validator
@@ -92,11 +93,25 @@ static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, p
 static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
   picojson::array tableNames;
 
-  for (auto &&tableIter : server.tables) {
+  for (auto &&tableIter : httpServer.tables) {
     tableNames.push_back(picojson::value(tableIter.first));
   }
 
   res["tables"] = picojson::value(tableNames);
 
   return true;
+}
+
+int main() {
+  uWS::Hub h;
+
+  // start http server
+  httpServerInit();
+
+  h.onHttpRequest(httpHandler);
+
+  h.listen(3000);
+  h.run();
+
+  return 0;
 }
