@@ -1,6 +1,6 @@
 #include <string>
 #include <vector>
-#include "deps/CRoaring/cpp/roaring.hh"
+#include "roaring.hh"
 #include "table.h"
 #include "generic-value.h"
 #include "utils.h"

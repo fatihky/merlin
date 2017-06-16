@@ -3,7 +3,7 @@
 #include <map>
 #include <vector>
 #include <cassert>
-#include "deps/CRoaring/cpp/roaring.hh"
+#include "roaring.hh"
 #include "query.h"
 #include "field.h"
 #include "query.h"

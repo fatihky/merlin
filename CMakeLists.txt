@@ -7,6 +7,6 @@ include_directories(deps/CRoaring/include deps/CRoaring/cpp)
 
 add_subdirectory("deps/CRoaring")
 
-set(SOURCE_FILES main.cpp query.cpp query.h generic-value.h field.h field-types.h table.h utils.h utils.cpp)
+set(SOURCE_FILES src/main.cpp src/query.cpp src/query.h src/generic-value.h src/field.h src/field-types.h src/table.h src/utils.h src/utils.cpp)
 add_executable(merlin ${SOURCE_FILES})
 target_link_libraries(merlin roaring)

@@ -6,8 +6,8 @@
 #include <vector>
 #include <map>
 #include <stdlib.h>
-#include "deps/CRoaring/cpp/roaring.hh"
-#include "deps/fastrange/fastrange.h"
+#include "roaring.hh"
+#include "../deps/fastrange/fastrange.h"
 #include "field-types.h"
 #include "generic-value.h"
 
