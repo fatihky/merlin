@@ -25,6 +25,7 @@ static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, p
 static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 
 // global server context
 static MerlinHttpServer httpServer = {
@@ -54,6 +55,7 @@ void httpServerInit() {
   httpServer.commandHandlers["show_tables"] = commandShowTables;
   httpServer.commandHandlers["create_table"] = commandCreateTable;
   httpServer.commandHandlers["describe_table"] = commandDescribeTable;
+  httpServer.commandHandlers["drop_table"] = commandDropTable;
 }
 
 void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
@@ -248,6 +250,30 @@ static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &h
   }
 
   res["fields"] = picojson::value(fields);
+
+  return true;
+}
+
+static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  picojson::array fields;
+  string tableName;
+
+  if (!req["name"].is<string>()) {
+    return setError(res, "name prop is required");
+  }
+
+  tableName = req["name"].to_str();
+
+  if (httpServer.tables.count(tableName) == 0) {
+    return setError(res, "table not found");
+  }
+
+  const Table *table = httpServer.tables[tableName];
+  httpServer.tables.erase(tableName);
+
+  delete table;
+
+  res["dropped"] = picojson::value(true);
 
   return true;
 }
