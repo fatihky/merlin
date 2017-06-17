@@ -361,6 +361,8 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   picojson::array fields;
   string tableName;
   string err;
+  picojson::array selectedFields;
+  picojson::array resultRows;
 
   if (!req["name"].is<string>()) {
     return setError(res, "name prop is required");
@@ -424,6 +426,15 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     if (obj["aggr_func"].is<string>()) {
       selectExpr->aggerationFunc = obj["aggr_func"].get<string>();
       selectExpr->isAggerationSelect = true;
+    }
+
+    // add this information to selectedFields array
+    if (!selectExpr->display.empty()) {
+      selectedFields.push_back(picojson::value(selectExpr->display));
+    } else if (!selectExpr->isAggerationSelect) {
+      selectedFields.push_back(picojson::value(selectExpr->field));
+    } else {
+      selectedFields.push_back(picojson::value(selectExpr->aggerationFunc + "(" + selectExpr->field + ")"));
     }
 
     query->selectExprs.push_back(selectExpr);
@@ -536,7 +547,28 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
 
   query->isAggregationQuery = true;
   query->run();
-  query->printResultRows();
+
+  for (auto &&row : query->result.rows) {
+    picojson::array picoRow;
+
+    for (auto &&value : row->values) {
+      if (value->type == FIELD_TYPE_STRING) {
+        picoRow.push_back(picojson::value(value->getStrVal()));
+      } else if (value->type == FIELD_TYPE_TIMESTAMP) {
+        picoRow.push_back(picojson::value(value->getInt64Val()));
+      } else if (value->type == FIELD_TYPE_BIGINT) {
+        picoRow.push_back(picojson::value((int64_t) value->getUInt64Val()));
+      } else {
+        err = "invalid result row value type: " + to_string(value->type);
+        goto error;
+      }
+    }
+
+    resultRows.push_back(picojson::value(picoRow));
+  }
+
+  res["columns"] = picojson::value(selectedFields);
+  res["rows"] = picojson::value(resultRows);
 
   return true;
 
