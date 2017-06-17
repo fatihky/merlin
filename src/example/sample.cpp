@@ -34,8 +34,7 @@ void insertRows(Table *table) {
 }
 
 void runQuery(Table *table) {
-  auto roar = new Roaring(roaring_bitmap_from_range(1, 7, 1));
-  Query *query = new Query(table, roar);
+  Query *query = new Query(table);
 //  FilterExpr *endpointMustBeHome = new FilterExpr("endpoint", "=", "/home");
   GroupByExpr *groupByExprEndpoint = new GroupByExpr("endpoint");
 //  GroupByExpr *groupByExprGender = new GroupByExpr("gender");
@@ -66,17 +65,10 @@ void runQuery(Table *table) {
   query->selectExprs.push_back(selectExprAvgResponseTime);
   query->orderByExprs.push_back(orderByExprTimestamp);
   query->orderByExprs.push_back(orderByExprCount);
-  // apply filters
-  query->applyFilters();
-  cout << "after filter, bitmap: ";
-  query->initialBitmap->printf();
-  cout << endl;
-  // apply groups
-  query->genAggrGroups();
-  // generate rows
-  query->genResultRows();
-  // apply order
-  query->applyOrder();
+
+  // run query
+  query->run();
+
   // print result rows
   query->printResultRows();
 }

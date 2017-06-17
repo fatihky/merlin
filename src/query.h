@@ -97,9 +97,9 @@ class Query {
   Roaring *filterResult;
   Table *table;
 
-  Query(Table *table_, Roaring *roar) {
+  Query(Table *table_) {
     table = table_;
-    initialBitmap = roar;
+    initialBitmap = nullptr;
   }
 
   void applyFilters();
@@ -107,6 +107,7 @@ class Query {
   void genResultRows();
   void applyOrder();
   void printResultRows();
+  void run();
 
   private:
   int findSelectFieldIndex(string field);
