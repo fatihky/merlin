@@ -198,10 +198,10 @@ class Field {
 
     const auto cStr = funcArgs[0].c_str();
     const int64_t secs = strtoll(cStr, nullptr, 10);
-    const aggr_func_date_seconds_group_data aggrResult = {
+    aggr_func_date_seconds_group_data aggrResult = {
       .seconds = secs,
-      .field = this,
-      .result = intResult
+      .result = intResult,
+      .field = this
     };
 
     initialBitmap->iterate(aggrFuncDateSecondsGroup, (void *) &aggrResult);
