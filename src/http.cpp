@@ -363,6 +363,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   string err;
   picojson::array selectedFields;
   picojson::array resultRows;
+  picojson::object queryStats;
   chrono::time_point<chrono::system_clock> start;
   chrono::duration<double> elapsed;
   long long milliseconds;
@@ -575,6 +576,16 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     }
 
     resultRows.push_back(picojson::value(picoRow));
+  }
+
+  if (req["query_stats_detailed"].is<bool>() && req["query_stats_detailed"].get<bool>() == true) {
+    queryStats["filter_us"] = picojson::value(query->stats.filter_us);
+    queryStats["filter_ms"] = picojson::value(query->stats.filter_ms);
+    queryStats["group_us"] = picojson::value(query->stats.group_us);
+    queryStats["group_ms"] = picojson::value(query->stats.group_ms);
+    queryStats["order_us"] = picojson::value(query->stats.order_us);
+    queryStats["order_ms"] = picojson::value(query->stats.order_ms);
+    res["query_stats_detailed"] = picojson::value(queryStats);
   }
 
   res["elapsed_ms"] = picojson::value((int64_t) milliseconds);

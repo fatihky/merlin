@@ -97,6 +97,17 @@ class Query {
   Roaring *filterResult;
   Table *table;
 
+  struct {
+    int64_t filter_us;
+    int64_t filter_ms;
+
+    int64_t group_us;
+    int64_t group_ms;
+
+    int64_t order_us;
+    int64_t order_ms;
+  } stats;
+
   Query(Table *table_) {
     table = table_;
     initialBitmap = nullptr;

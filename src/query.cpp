@@ -272,6 +272,9 @@ void Query::printResultRows() {
 void Query::run() {
   // prepare initial bitmap
   Roaring *roar;
+  chrono::time_point<chrono::system_clock> start;
+  chrono::duration<double> elapsed;
+  long long duration;
 
   if (table->size > 0) {
     roar = new Roaring(roaring_bitmap_from_range(1, table->size + 1, 1));
@@ -281,13 +284,28 @@ void Query::run() {
   initialBitmap = roar;
 
   // apply filters
+  start = std::chrono::system_clock::now();
   applyFilters();
+  elapsed = std::chrono::system_clock::now() - start;
+  stats.filter_us = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+  stats.filter_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+
   // apply groups
+  start = std::chrono::system_clock::now();
   genAggrGroups();
+  elapsed = std::chrono::system_clock::now() - start;
+  stats.group_us = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+  stats.group_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+
   // generate rows
   genResultRows();
+
   // apply order
+  start = std::chrono::system_clock::now();
   applyOrder();
+  elapsed = std::chrono::system_clock::now() - start;
+  stats.order_us = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
+  stats.order_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
 
   // reset initial bitmap
   initialBitmap = nullptr;
