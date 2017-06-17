@@ -1,9 +1,5 @@
 /cmake-build-debug
 
-# third party dependencies
-/deps/CRoaring
-/deps/fastrange
-
 # build dir
 build/
 
