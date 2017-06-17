@@ -577,8 +577,8 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     resultRows.push_back(picojson::value(picoRow));
   }
 
-  res["elapsed_ms"] = picojson::value(milliseconds);
-  res["elapsed_us"] = picojson::value(microseconds);
+  res["elapsed_ms"] = picojson::value((int64_t) milliseconds);
+  res["elapsed_us"] = picojson::value((int64_t) microseconds);
   res["columns"] = picojson::value(selectedFields);
   res["rows"] = picojson::value(resultRows);
 
