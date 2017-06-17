@@ -308,7 +308,7 @@ static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest 
     return setError(res, "table not found");
   }
 
-  const Table *table = httpServer.tables[tableName];
+  Table *table = httpServer.tables[tableName];
 
   for (auto &&row : rows.get<picojson::array>()) {
     if (!row.is<picojson::object>()) {
