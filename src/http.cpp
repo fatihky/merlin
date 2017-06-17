@@ -2,7 +2,7 @@
 #include <map>
 #include <uWS/uWS.h>
 #include "table.h"
-#include "field.h"
+#include "query.h"
 
 // picojson and roaring bitmap both declares this
 // but picojson does does not check whether this
@@ -35,6 +35,7 @@ static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &htt
 static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 
 // global server context
 static MerlinHttpServer httpServer = {
@@ -66,6 +67,7 @@ void httpServerInit() {
   httpServer.commandHandlers["describe_table"] = commandDescribeTable;
   httpServer.commandHandlers["drop_table"] = commandDropTable;
   httpServer.commandHandlers["insert_into_table"] = commandInsertIntoTable;
+  httpServer.commandHandlers["query_table"] = commandQueryTable;
 }
 
 void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
@@ -348,6 +350,193 @@ static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest 
   }
 
   res["inserted"] = picojson::value(true);
+
+  return true;
+
+  error:
+    return setError(res, err);
+}
+
+static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  picojson::array fields;
+  string tableName;
+  string err;
+
+  if (!req["name"].is<string>()) {
+    return setError(res, "name prop is required");
+  }
+
+  if (!req["select"].is<picojson::array>()) {
+    return setError(res, "select prop must be an array");
+  }
+
+  if (!req["filters"].is<picojson::array>()) {
+    return setError(res, "filters prop must be an array");
+  }
+
+  if (!req["group_by"].is<picojson::array>()) {
+    return setError(res, "group_by prop must be an array");
+  }
+
+  if (!req["order_by"].is<picojson::array>()) {
+    return setError(res, "order_by prop must be an array");
+  }
+
+  tableName = req["name"].to_str();
+
+  if (httpServer.tables.count(tableName) == 0) {
+    return setError(res, "table not found");
+  }
+
+  Table *table = httpServer.tables[tableName];
+  auto query = new Query(table);
+
+  for (auto &&row : req["select"].get<picojson::array>()) {
+    if (!row.is<picojson::object>()) {
+      err = "each select expression must be an object";
+      goto error;
+    }
+
+    picojson::object obj = row.get<picojson::object>();
+    SelectExpr *selectExpr;
+    string field;
+    string aggrFunc;
+    string display;
+
+    if (!obj["field"].is<string>()) {
+      err = "select: field prop is required in each filter obj.";
+      goto error;
+    }
+
+    field = obj["field"].get<string>();
+
+    if (field.empty()) {
+      err = "select: field can not be empty";
+      goto error;
+    }
+
+    selectExpr = new SelectExpr(field);
+
+    if (obj["display"].is<string>()) {
+      selectExpr->display = obj["display"].get<string>();
+    }
+
+    if (obj["aggr_func"].is<string>()) {
+      selectExpr->aggerationFunc = obj["aggr_func"].get<string>();
+      selectExpr->isAggerationSelect = true;
+    }
+
+    query->selectExprs.push_back(selectExpr);
+  }
+
+  for (auto &&row : req["filters"].get<picojson::array>()) {
+    if (!row.is<picojson::object>()) {
+      err = "each filter must be an object";
+      goto error;
+    }
+
+    picojson::object obj = row.get<picojson::object>();
+    string field;
+    string op;
+    string value;
+
+    if (!obj["field"].is<string>()) {
+      err = "filters: field prop is required in each filter obj.";
+      goto error;
+    }
+
+    field = obj["field"].get<string>();
+
+    if (field.empty()) {
+      err = "filters: field can not be empty";
+      goto error;
+    }
+
+    if (!obj["operator"].is<string>()) {
+      err = "filters: field prop is required in each filter obj.";
+      goto error;
+    }
+
+    op = obj["operator"].get<string>();
+
+    if (op.empty()) {
+      err = "filters: operator can not be empty";
+      goto error;
+    }
+
+    if (!obj["value"].is<string>()) {
+      err = "filters: value prop is required in each filter obj.";
+      goto error;
+    }
+
+    value = obj["field"].get<string>();
+
+    if (value.empty()) {
+      err = "filters: value can not be empty";
+      goto error;
+    }
+
+    cout << "new filter: " << field << op << value << endl;
+    query->filterExprs.push_back(new FilterExpr(field, op, value));
+  }
+
+  for (auto &&row : req["group_by"].get<picojson::array>()) {
+    if (!row.is<picojson::object>()) {
+      err = "each group by expression must be an object";
+      goto error;
+    }
+
+    picojson::object obj = row.get<picojson::object>();
+    string field;
+
+    if (!obj["field"].is<string>()) {
+      err = "group by: field prop is required in each filter obj.";
+      goto error;
+    }
+
+    field = obj["field"].get<string>();
+
+    if (field.empty()) {
+      err = "group by: field can not be empty";
+      goto error;
+    }
+
+    query->groupByExprs.push_back(new GroupByExpr(field));
+  }
+
+  for (auto &&row : req["order_by"].get<picojson::array>()) {
+    if (!row.is<picojson::object>()) {
+      err = "each order by expression must be an object";
+      goto error;
+    }
+
+    picojson::object obj = row.get<picojson::object>();
+    string field;
+
+    if (!obj["field"].is<string>()) {
+      err = "order by: field prop is required in each filter obj.";
+      goto error;
+    }
+
+    field = obj["field"].get<string>();
+
+    if (field.empty()) {
+      err = "order by: field can not be empty";
+      goto error;
+    }
+
+    auto orderByExpr = new OrderByExpr(field);
+
+    if (obj["asc"].is<bool>()) {
+      orderByExpr->asc = obj["asc"].get<bool>();
+    }
+
+    query->orderByExprs.push_back(orderByExpr);
+  }
+
+  query->isAggregationQuery = true;
+  query->run();
+  query->printResultRows();
 
   return true;
 
