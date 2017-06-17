@@ -343,6 +343,8 @@ static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest 
       }
     }
 
+    table->incrementRecordCount();
+
   }
 
   res["inserted"] = picojson::value(true);

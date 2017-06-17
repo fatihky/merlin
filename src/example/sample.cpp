@@ -15,6 +15,7 @@ void insertRow(Table *table, int64_t timestamp, string referrer, string endpoint
   table->fields["referrer"]->addValue(GenericValueContainer(referrer));
   table->fields["gender"]->addValue(GenericValueContainer(gender));
   table->fields["responseTime"]->addValue(GenericValueContainer(responseTime));
+  table->incrementRecordCount();
 }
 
 void insertRows(Table *table) {
