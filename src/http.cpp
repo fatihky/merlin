@@ -363,6 +363,10 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   string err;
   picojson::array selectedFields;
   picojson::array resultRows;
+  chrono::time_point<chrono::steady_clock> start;
+  chrono::duration<double> elapsed;
+  long long milliseconds;
+  long long microseconds;
 
   if (!req["name"].is<string>()) {
     return setError(res, "name prop is required");
@@ -545,8 +549,14 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     query->orderByExprs.push_back(orderByExpr);
   }
 
+  start = std::chrono::high_resolution_clock::now();
+
   query->isAggregationQuery = true;
   query->run();
+
+  elapsed = std::chrono::high_resolution_clock::now() - start;
+  milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+  microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
   for (auto &&row : query->result.rows) {
     picojson::array picoRow;
@@ -567,6 +577,8 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     resultRows.push_back(picojson::value(picoRow));
   }
 
+  res["elapsed_ms"] = picojson::value(milliseconds);
+  res["elapsed_us"] = picojson::value(microseconds);
   res["columns"] = picojson::value(selectedFields);
   res["rows"] = picojson::value(resultRows);
 
