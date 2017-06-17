@@ -50,9 +50,7 @@ void Query::genAggrGroups() {
       for (auto &&group : groups) {
         const auto aggregationGroup = new AggregationGroup(field->name, group.first, group.second);
         aggrGroupsField.push_back(aggregationGroup);
-        cout << "created group for... " << group.first << " bitmap: ";
-        aggregationGroup->bitmap->printf();
-        cout << endl;
+        cout << "created group for... " << group.first << " bitmap size: " << aggregationGroup->bitmap->cardinality() << endl;
       }
       result = aggrGroupsField;
 
@@ -79,8 +77,8 @@ void Query::genAggrGroups() {
           cout << "generated group for... " << group.first << endl;
           cout << "generated keys: ";
           dumpStrVector(aggregationGroup->keys);
-          cout << " | bitmap: ";
-          aggregationGroup->bitmap->printf();
+          cout << " | bitmap size: ";
+          aggregationGroup->bitmap->cardinality();
           cout << endl;
         }
 
