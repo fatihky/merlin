@@ -1,9 +1,9 @@
-[submodule "deps/CRoaring"]
-	path = deps/CRoaring
-	url = git@github.com:RoaringBitmap/CRoaring
 [submodule "deps/picojson"]
 	path = deps/picojson
 	url = git@github.com:kazuho/picojson.git
 [submodule "deps/fastrange"]
 	path = deps/fastrange
 	url = git@github.com:lemire/fastrange.git
+[submodule "deps/CRoaring"]
+	path = deps/CRoaring
+	url = git@github.com:RoaringBitmap/CRoaring
