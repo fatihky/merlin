@@ -363,7 +363,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   string err;
   picojson::array selectedFields;
   picojson::array resultRows;
-  chrono::time_point<chrono::steady_clock> start;
+  chrono::time_point<chrono::system_clock> start;
   chrono::duration<double> elapsed;
   long long milliseconds;
   long long microseconds;
@@ -549,12 +549,12 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     query->orderByExprs.push_back(orderByExpr);
   }
 
-  start = std::chrono::high_resolution_clock::now();
+  start = std::chrono::system_clock::now();
 
   query->isAggregationQuery = true;
   query->run();
 
-  elapsed = std::chrono::high_resolution_clock::now() - start;
+  elapsed = std::chrono::system_clock::now() - start;
   milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
   microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
 
