@@ -276,7 +276,7 @@ void Query::run() {
   Roaring *roar;
 
   if (table->size > 0) {
-    roar = new Roaring(roaring_bitmap_from_range(1, table->size, 1));
+    roar = new Roaring(roaring_bitmap_from_range(1, table->size + 1, 1));
   } else {
     roar = new Roaring();
   }
