@@ -450,7 +450,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
       goto error;
     }
 
-    picojson::object obj = row.get<picojson::object>();
+    picojson::object& obj = row.get<picojson::object>();
     string field;
     string op;
     string value;
