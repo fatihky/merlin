@@ -318,7 +318,7 @@ static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest 
       goto error;
     }
 
-    const picojson::object& obj = row.get<picojson::object>();
+    picojson::object& obj = row.get<picojson::object>();
 
     for (auto &&fieldIter : table->fields) {
       auto field = fieldIter.second;
@@ -399,7 +399,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
       goto error;
     }
 
-    const picojson::object& obj = row.get<picojson::object>();
+    picojson::object& obj = row.get<picojson::object>();
     SelectExpr *selectExpr;
     string field;
     string aggrFunc;
@@ -497,7 +497,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
       goto error;
     }
 
-    const picojson::object& obj = row.get<picojson::object>();
+    picojson::object& obj = row.get<picojson::object>();
     string field;
 
     if (!obj["field"].is<string>()) {
@@ -521,7 +521,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
       goto error;
     }
 
-    const picojson::object& obj = row.get<picojson::object>();
+    picojson::object& obj = row.get<picojson::object>();
     string field;
 
     if (!obj["field"].is<string>()) {
