@@ -83,7 +83,7 @@ class AggregationGroup {
   }
 
   ~AggregationGroup() {
-    delete bitmap;
+    roaring_bitmap_free(bitmap);
   }
 };
 

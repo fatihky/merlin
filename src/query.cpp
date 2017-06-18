@@ -78,6 +78,10 @@ void Query::genAggrGroups() {
 
       if (isAggerationGroupBy) {
         aggrSelectExpr->groups = std::move(groups);
+      } else {
+        for (auto &&group : groups) {
+          roaring_bitmap_free(group.second);
+        }
       }
       continue;
     }
@@ -368,5 +372,5 @@ void Query::run() {
 
   // reset initial bitmap
   initialBitmap = nullptr;
-  delete roar;
+  roaring_bitmap_free(roar);
 }

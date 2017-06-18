@@ -13,6 +13,12 @@ class Table {
   map<string, Field *> fields;
   uint32_t size; // record count
 
+  ~Table() {
+    for (auto &&it : fields) {
+      delete it.second;
+    }
+  }
+
   void setField(Field *field) {
     fields[field->name] = field;
   }

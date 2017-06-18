@@ -57,7 +57,26 @@ class Field {
     size = 0;
   }
 
-  ~Field() {}
+  ~Field() {
+    switch (type) {
+      case FIELD_TYPE_BOOLEAN: {
+        roaring_bitmap_free(storage.bvals);
+      } break;
+      case FIELD_TYPE_STRING: {
+        switch (encoding) {
+          case FIELD_ENCODING_DICT: {
+            for (auto &&it : storage.strval.dict.dict) {
+              roaring_bitmap_free(it.second);
+            }
+          }
+          default: break;
+        }
+      } break;
+      default: {
+        break;
+      }
+    }
+  }
 
   void setEncoding(const int encoding_) {
     encoding = encoding_;

@@ -78,6 +78,13 @@ void httpServerInit() {
   httpServer.hub.onHttpRequest(httpHandler);
 }
 
+void httpServerDeinit() {
+  for (auto &&it : httpServer.tables) {
+    auto table = it.second;
+    delete table;
+  }
+}
+
 void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
   if (req.getMethod() != uWS::METHOD_POST) {
     return res->end("only post is supported", 22);
@@ -646,6 +653,8 @@ int main() {
 
   httpServer.hub.listen(3000);
   httpServer.hub.run();
+
+  httpServerDeinit();
 
   return 0;
 }
