@@ -125,8 +125,13 @@ class Field {
               throw std::runtime_error("unsupported operator");
             }
 
+            if (storage.strval.dict.dict.count(value) == 0) {
+              return nullptr;
+            }
+
             return storage.strval.dict.dict[value];
           };
+
           default: throw std::runtime_error("unsupported string encoding");
         }
       } break;

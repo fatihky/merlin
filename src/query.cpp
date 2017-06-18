@@ -11,9 +11,15 @@ void Query::applyFilters() {
   for (auto &&filter : filterExprs) {
     cout << filter->field << " " << filter->op << " " << filter->val << endl;
     auto bitmap = table->fields[filter->field]->getBitmap(filter->op, filter->val);
-    cout << "field's bitmap: ";
-    bitmap->printf();
-    cout << endl;
+    if (bitmap == nullptr) {
+      // this means no results found for this bitmap.
+      // while we always doing AND on result bitmaps,
+      // we could get empty bitmap
+      // so I am resetting result bitmap and stopping loop
+      roaring_bitmap_clear(&result->roaring);
+      break;
+    }
+    cout << "field's bitmap's cardinality: " << bitmap->cardinality() << endl;
     (*result) &= *bitmap;
     cout << "current bitmap: ";
     result->printf();
