@@ -28,4 +28,5 @@ void commandDescribeTable(picojson::object &req, picojson::object &res) {
   }
 
   res["fields"] = picojson::value(fields);
+  res["record_count"] = picojson::value((int64_t) table->size);
 }
