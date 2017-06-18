@@ -23,13 +23,18 @@ typedef bool (*CommandHandlerFunc) (uWS::HttpResponse *httpRes, uWS::HttpRequest
 struct MerlinHttpServer {
   map<string, CommandHandlerFunc> commandHandlers;
   map<string, Table *> tables;
+  uWS::Hub hub;
 };
+
+// http request handler
+void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes);
 
 // request validator
 static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, picojson::object &doc);
 
 // command handlers
 static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+static bool commandQuit(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
 static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
@@ -62,12 +67,15 @@ map<int, string> encodingTypeToStr = {
 
 void httpServerInit() {
   httpServer.commandHandlers["ping"] = commandPing;
+  httpServer.commandHandlers["quit"] = commandQuit;
   httpServer.commandHandlers["show_tables"] = commandShowTables;
   httpServer.commandHandlers["create_table"] = commandCreateTable;
   httpServer.commandHandlers["describe_table"] = commandDescribeTable;
   httpServer.commandHandlers["drop_table"] = commandDropTable;
   httpServer.commandHandlers["insert_into_table"] = commandInsertIntoTable;
   httpServer.commandHandlers["query_table"] = commandQueryTable;
+
+  httpServer.hub.onHttpRequest(httpHandler);
 }
 
 void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
@@ -132,6 +140,12 @@ static bool setError(picojson::object &res, string message) {
 
 static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
   res["pong"] = picojson::value(true);
+  return true;
+}
+
+static bool commandQuit(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  res["quit"] = picojson::value(true);
+  uv_stop(httpServer.hub.getLoop());
   return true;
 }
 
@@ -625,17 +639,13 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
 }
 
 int main() {
-  uWS::Hub h;
-
   // start http server
   httpServerInit();
 
-  h.onHttpRequest(httpHandler);
-
   cout << "starting http server on :3000" << endl;
 
-  h.listen(3000);
-  h.run();
+  httpServer.hub.listen(3000);
+  httpServer.hub.run();
 
   return 0;
 }
