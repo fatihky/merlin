@@ -9,7 +9,9 @@ void Query::applyFilters() {
   auto result = initialBitmap;
 
   for (auto &&filter : filterExprs) {
-    cout << filter->field << " " << filter->op << " " << filter->val << endl;
+    if (debug) {
+      cout << filter->field << " " << filter->op << " " << filter->val << endl;
+    }
     auto bitmap = table->fields[filter->field]->getBitmap(filter->op, filter->val);
     if (bitmap == nullptr) {
       // this means no results found for this bitmap.
@@ -19,9 +21,16 @@ void Query::applyFilters() {
       roaring_bitmap_clear(&result->roaring);
       break;
     }
-    cout << "field's bitmap's cardinality: " << bitmap->cardinality() << endl;
+
+    if (debug) {
+      cout << "field's bitmap's cardinality: " << bitmap->cardinality() << endl;
+    }
+
     (*result) &= *bitmap;
-    cout << "current bitmap's cardinality: " << result->cardinality() << endl;
+
+    if (debug) {
+      cout << "current bitmap's cardinality: " << result->cardinality() << endl;
+    }
   }
 }
 
@@ -53,7 +62,10 @@ void Query::genAggrGroups() {
       for (auto &&group : groups) {
         const auto aggregationGroup = new AggregationGroup(field->name, group.first, group.second);
         aggrGroupsField.push_back(aggregationGroup);
-        cout << "created group for... " << group.first << " bitmap size: " << aggregationGroup->bitmap->cardinality() << endl;
+        if (debug) {
+          cout << "created group for... " << group.first << " bitmap size: " << aggregationGroup->bitmap->cardinality()
+               << endl;
+        }
       }
       result = aggrGroupsField;
 
@@ -65,9 +77,11 @@ void Query::genAggrGroups() {
 
     vector<AggregationGroup *> aggrGroupsField;
     for (auto &&groupByGroup : result) {
-      cout << endl << "generate new groups for key ";
-      dumpStrVector(groupByGroup->keys);
-      cout << endl;
+      if (debug) {
+        cout << endl << "generate new groups for key ";
+        dumpStrVector(groupByGroup->keys);
+        cout << endl;
+      }
 
       for (unsigned long i = 0, size = groupByGroup->keys.size(); i < size; ++i) {
         const auto currentBitmap = groupByGroup->bitmap;
@@ -77,12 +91,15 @@ void Query::genAggrGroups() {
         for (auto &&group : groups) {
           const auto aggregationGroup = groupByGroup->clone(field->name, group.first, group.second);
           aggrGroupsField.push_back(aggregationGroup);
-          cout << "generated group for... " << group.first << endl;
-          cout << "generated keys: ";
-          dumpStrVector(aggregationGroup->keys);
-          cout << " | bitmap size: ";
-          aggregationGroup->bitmap->cardinality();
-          cout << endl;
+
+          if (debug) {
+            cout << "generated group for... " << group.first << endl;
+            cout << "generated keys: ";
+            dumpStrVector(aggregationGroup->keys);
+            cout << " | bitmap size: ";
+            aggregationGroup->bitmap->cardinality();
+            cout << endl;
+          }
         }
 
         if (isAggerationGroupBy) {
@@ -112,42 +129,58 @@ void Query::genResultRows() {
             throw std::runtime_error("only '*' is supported for count()");
           }
 
-          cout << "[" << aggrGroup->bitmap->cardinality() << "] ";
+          if (debug) {
+            cout << "[" << aggrGroup->bitmap->cardinality() << "] ";
+          }
           row->values.push_back(new GenericValueContainer(aggrGroup->bitmap->cardinality()));
         } else if (selectExpr->aggerationFunc == "min") {
           const auto field = table->fields[selectExpr->field];
           const auto min = field->aggrFuncMin(aggrGroup->bitmap);
-          cout << "[" << min << "] ";
+          if (debug) {
+            cout << "[" << min << "] ";
+          }
           row->values.push_back(new GenericValueContainer(min));
         } else if (selectExpr->aggerationFunc == "max") {
           const auto field = table->fields[selectExpr->field];
           const auto max = field->aggrFuncMax(aggrGroup->bitmap);
-          cout << "[" << max << "] ";
+          if (debug) {
+            cout << "[" << max << "] ";
+          }
           row->values.push_back(new GenericValueContainer(max));
         } else if (selectExpr->aggerationFunc == "sum") {
           const auto field = table->fields[selectExpr->field];
           const auto sum = field->aggrFuncSum(aggrGroup->bitmap);
-          cout << "[" << sum << "] ";
+          if (debug) {
+            cout << "[" << sum << "] ";
+          }
           row->values.push_back(new GenericValueContainer(sum));
         } else if (selectExpr->aggerationFunc == "avg" || selectExpr->aggerationFunc == "mean") {
           const auto field = table->fields[selectExpr->field];
           const auto sum = field->aggrFuncSum(aggrGroup->bitmap);
           const auto avg = sum / aggrGroup->bitmap->cardinality();
-          cout << "[" << avg << "] ";
+          if (debug) {
+            cout << "[" << avg << "] ";
+          }
           row->values.push_back(new GenericValueContainer(avg));
         } else if (selectExpr->aggerationFunc == "dateSecondsGroup") {
-          cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
+          if (debug) {
+            cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
+          }
           row->values.push_back(new GenericValueContainer(aggrGroup->valueMap[selectExpr->field]));
         } else {
           throw std::runtime_error("unknown aggregation function: " + selectExpr->aggerationFunc + " -- " + (selectExpr->aggerationFunc == "count" ? "true" : "false"));
         }
       } else {
-        cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
+        if (debug) {
+          cout << "[" << aggrGroup->valueMap[selectExpr->field] << "] ";
+        }
         row->values.push_back(new GenericValueContainer(aggrGroup->valueMap[selectExpr->field]));
       }
     }
 
-    cout << endl;
+    if (debug) {
+      cout << endl;
+    }
 
     result.rows.push_back(row);
   }
@@ -224,8 +257,6 @@ void Query::applyOrder() {
 
     return false;
   });
-
-  cout << "after sort" << endl;
 }
 
 void Query::printResultRows() {

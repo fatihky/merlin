@@ -362,6 +362,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   picojson::array fields;
   string tableName;
   string err;
+  bool debug = false;
   picojson::array selectedFields;
   picojson::array resultRows;
   picojson::object queryStats;
@@ -390,6 +391,10 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     return setError(res, "order_by prop must be an array");
   }
 
+  if (req["debug"].is<bool>()) {
+    debug = req["debug"].get<bool>();
+  }
+
   tableName = req["name"].to_str();
 
   if (httpServer.tables.count(tableName) == 0) {
@@ -397,7 +402,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   }
 
   Table *table = httpServer.tables[tableName];
-  query = new Query(table);
+  query = new Query(table, debug);
 
   for (auto &&row : req["select"].get<picojson::array>()) {
     if (!row.is<picojson::object>()) {

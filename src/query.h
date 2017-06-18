@@ -111,6 +111,7 @@ class Query {
   QueryResult result;
   Roaring *initialBitmap;
   Table *table;
+  bool debug;
 
   struct {
     int64_t filter_us;
@@ -123,9 +124,10 @@ class Query {
     int64_t order_ms;
   } stats;
 
-  Query(Table *table_) {
+  Query(Table *table_, bool debug_ = false) {
     table = table_;
     initialBitmap = nullptr;
+    debug = debug_;
   }
 
   ~Query() {
