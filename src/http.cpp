@@ -5,17 +5,28 @@
 #include "table.h"
 #include "query.h"
 #include "server_http.hpp"
-
-// picojson and roaring bitmap both declares this
-// but picojson does does not check whether this
-// constant is defined
-#ifdef __STDC_FORMAT_MACROS
-#  undef __STDC_FORMAT_MACROS
-#endif
-#define PICOJSON_USE_INT64
-#include "picojson.h"
+#include "http.h"
 
 using namespace std;
+
+map<string, int> fieldTypes = {
+  {"timestamp", FIELD_TYPE_TIMESTAMP},
+  {"string", FIELD_TYPE_STRING},
+  {"int", FIELD_TYPE_INT}
+};
+map<string, int> encodingTypes = {
+  {"dict", FIELD_ENCODING_DICT}
+};
+map<int, string> fieldTypeToStr = {
+  {FIELD_TYPE_TIMESTAMP, "timestamp"},
+  {FIELD_TYPE_STRING, "string"},
+  {FIELD_TYPE_INT, "int"}
+};
+map<int, string> encodingTypeToStr = {
+  {FIELD_ENCODING_NONE, "none"},
+  {FIELD_ENCODING_DICT, "dict"},
+  {FIELD_ENCODING_MULTI_VAL, "multi_val"}
+};
 
 typedef SimpleWeb::Server<SimpleWeb::HTTP> HttpServer;
 
@@ -40,55 +51,16 @@ class MerlinHttpServerResponse {
   }
 };
 
-// return values:
-// true: send response document to the client
-// false: do not send anything, handler already sent custom response
-typedef bool (*CommandHandlerFunc) (MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-
-struct MerlinHttpServer {
-  map<string, CommandHandlerFunc> commandHandlers;
-  map<string, Table *> tables;
-  HttpServer server;
-};
-
 // http request handler
-void httpHandler(shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request);
+static void httpHandler(shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request);
 
 // request validator
 static bool validateRequestBody(MerlinHttpServerResponse &res, picojson::object &doc);
 
-// command handlers
-static bool commandPing(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-static bool commandQuit(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-static bool commandShowTables(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-static bool commandCreateTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-static bool commandDescribeTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-static bool commandDropTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-static bool commandInsertIntoTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-static bool commandQueryTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
-
 // global server context
-static MerlinHttpServer httpServer = {
+MerlinHttpServer httpServer = {
 };
-
-map<string, int> fieldTypes = {
-  {"timestamp", FIELD_TYPE_TIMESTAMP},
-  {"string", FIELD_TYPE_STRING},
-  {"int", FIELD_TYPE_INT}
-};
-map<string, int> encodingTypes = {
-  {"dict", FIELD_ENCODING_DICT}
-};
-map<int, string> fieldTypeToStr = {
-  {FIELD_TYPE_TIMESTAMP, "timestamp"},
-  {FIELD_TYPE_STRING, "string"},
-  {FIELD_TYPE_INT, "int"}
-};
-map<int, string> encodingTypeToStr = {
-  {FIELD_ENCODING_NONE, "none"},
-  {FIELD_ENCODING_DICT, "dict"},
-  {FIELD_ENCODING_MULTI_VAL, "multi_val"}
-};
+HttpServer server;
 
 void httpServerInit() {
   httpServer.commandHandlers["ping"] = commandPing;
@@ -108,6 +80,16 @@ void httpServerDeinit() {
     auto table = it.second;
     delete table;
   }
+}
+
+void httpServerStop() {
+  server.stop();
+}
+
+// helper function for handlers
+void setError(picojson::object &res, string message) {
+  res["stat"] = picojson::value("error");
+  res["error_message"] = picojson::value(message);
 }
 
 void httpHandler(shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) {
@@ -138,12 +120,10 @@ void httpHandler(shared_ptr<HttpServer::Response> response, shared_ptr<HttpServe
 
   const string cmd = documentWrap.get("command").to_str();
   const auto handler = httpServer.commandHandlers[cmd];
-  const auto sendResponseDocument = handler(res, documentWrap.get<picojson::object>(), responseDocument);
+  handler(documentWrap.get<picojson::object>(), responseDocument);
 
-  if (sendResponseDocument) {
-    const auto responseString = picojson::value(responseDocument).serialize();
-    res.end(responseString.c_str(), responseString.size());
-  }
+  const auto responseString = picojson::value(responseDocument).serialize();
+  res.end(responseString.c_str(), responseString.size());
 }
 
 static bool validateRequestBody(MerlinHttpServerResponse &res, picojson::object &doc) {
@@ -163,522 +143,16 @@ static bool validateRequestBody(MerlinHttpServerResponse &res, picojson::object 
   return true;
 }
 
-static bool setError(picojson::object &res, string message) {
-  res["stat"] = picojson::value("error");
-  res["error_message"] = picojson::value(message);
-  return true;
-}
-
-static bool commandPing(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  res["pong"] = picojson::value(true);
-  return true;
-}
-
-static bool commandQuit(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  res["quit"] = picojson::value(true);
-  httpServer.server.stop();
-  return true;
-}
-
-static bool commandShowTables(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  picojson::array tableNames;
-
-  for (auto &&tableIter : httpServer.tables) {
-    tableNames.push_back(picojson::value(tableIter.first));
-  }
-
-  res["tables"] = picojson::value(tableNames);
-
-  return true;
-}
-
-static bool commandCreateTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  picojson::array tableNames;
-  string tableName;
-  const auto fields = req["fields"];
-  string err;
-  const auto table = new Table();
-
-  if (!req["name"].is<string>()) {
-    err = "table name is required";
-    goto error;
-  }
-
-  tableName = req["name"].to_str();
-
-  if (httpServer.tables.count(tableName) == 1) {
-    err = "table already exist";
-    goto error;
-  }
-
-  if (!fields.is<picojson::array>()) {
-    err = "fields prop is required.";
-    goto error;
-  }
-
-  for (auto &&field : fields.get<picojson::array>()) {
-    if (!field.is<picojson::object>()) {
-      err = "field must be an object";
-      goto error;
-    }
-
-    auto obj = field.get<picojson::object>();
-    string name;
-    string type;
-    string encoding;
-
-    if (!obj["name"].is<string>()) {
-      err = "name prop required in field definitions";
-      goto error;
-    }
-
-    name = obj["name"].to_str();
-
-    if (!obj["type"].is<string>()) {
-      err = "type prop required in field definitions";
-      goto error;
-    }
-
-    type = obj["type"].to_str();
-
-    if (fieldTypes.count(type) == 0) {
-      err = "invalid field type: " + type;
-      goto error;
-    }
-
-    if (obj["encoding"].is<string>()) {
-      encoding = obj["encoding"].to_str();
-
-      if (encodingTypes.count(encoding) == 0) {
-        err = "invalid encoding type: " + encoding;
-        goto error;
-      }
-
-      if (encoding == "dict" && type != "string") {
-        err = "dict encoding only usable with string fields at the moment";
-        goto error;
-      }
-    }
-
-    const auto mField = new Field(name, fieldTypes[type]);
-
-    if (!encoding.empty()) {
-      mField->encoding = encodingTypes[encoding];
-    }
-
-    table->setField(mField);
-  }
-
-  httpServer.tables[tableName] = table;
-
-  res["created"] = picojson::value(true);
-
-  return true;
-
-  error:
-
-  delete table;
-
-  return setError(res, err);
-}
-
-static bool commandDescribeTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  picojson::array fields;
-  string tableName;
-
-  if (!req["name"].is<string>()) {
-    return setError(res, "name prop is required");
-  }
-
-  tableName = req["name"].to_str();
-
-  if (httpServer.tables.count(tableName) == 0) {
-    return setError(res, "table not found");
-  }
-
-  const Table *table = httpServer.tables[tableName];
-
-  for (auto &&iter : table->fields) {
-    const auto field = iter.second;
-    picojson::object obj;
-
-    obj["name"] = picojson::value(field->name);
-    obj["type"] = picojson::value(fieldTypeToStr[field->type]);
-    obj["encoding"] = picojson::value(encodingTypeToStr[field->encoding]);
-
-    fields.push_back(picojson::value(obj));
-  }
-
-  res["fields"] = picojson::value(fields);
-
-  return true;
-}
-
-static bool commandDropTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  picojson::array fields;
-  string tableName;
-
-  if (!req["name"].is<string>()) {
-    return setError(res, "name prop is required");
-  }
-
-  tableName = req["name"].to_str();
-
-  if (httpServer.tables.count(tableName) == 0) {
-    return setError(res, "table not found");
-  }
-
-  const Table *table = httpServer.tables[tableName];
-  httpServer.tables.erase(tableName);
-
-  delete table;
-
-  res["dropped"] = picojson::value(true);
-
-  return true;
-}
-
-static bool commandInsertIntoTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  picojson::array fields;
-  string tableName;
-  string err;
-  auto rows = req["rows"];
-
-  if (!req["name"].is<string>()) {
-    return setError(res, "name prop is required");
-  }
-
-  if (!rows.is<picojson::array>()) {
-    return setError(res, "rows prop must be an array");
-  }
-
-  tableName = req["name"].to_str();
-
-  if (httpServer.tables.count(tableName) == 0) {
-    return setError(res, "table not found");
-  }
-
-  Table *table = httpServer.tables[tableName];
-
-  for (auto &&row : rows.get<picojson::array>()) {
-    if (!row.is<picojson::object>()) {
-      err = "each row must be an object";
-      goto error;
-    }
-
-    picojson::object& obj = row.get<picojson::object>();
-
-    for (auto &&fieldIter : table->fields) {
-      auto field = fieldIter.second;
-      auto value = obj[field->name];
-      if (value.is<double>()) {
-        if (field->type == FIELD_TYPE_TIMESTAMP) {
-          field->addValue(std::move(GenericValueContainer(value.get<int64_t>())));
-        } else if (field->type == FIELD_TYPE_INT) {
-          field->addValue(std::move(GenericValueContainer((int) value.get<int64_t>())));
-        } else {
-          err = "invalid value type for field: " + field->name;
-          goto error;
-        }
-      } else if (value.is<string>()) {
-        if (field->type == FIELD_TYPE_STRING) {
-          field->addValue(std::move(GenericValueContainer(value.to_str())));
-        } else {
-          err = "invalid value type for field: " + field->name;
-          goto error;
-        }
-      } else {
-        err = "invalid value type for field: " + field->name;
-        goto error;
-      }
-    }
-
-    table->incrementRecordCount();
-
-  }
-
-  res["inserted"] = picojson::value(true);
-
-  return true;
-
-  error:
-    return setError(res, err);
-}
-
-static bool commandQueryTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
-  Query *query = nullptr;
-  picojson::array fields;
-  string tableName;
-  string err;
-  bool debug = false;
-  int limit = -1;
-  picojson::array selectedFields;
-  picojson::array resultRows;
-  picojson::object queryStats;
-  chrono::time_point<chrono::system_clock> start;
-  chrono::duration<double> elapsed;
-  long long milliseconds;
-  long long microseconds;
-
-  if (!req["name"].is<string>()) {
-    return setError(res, "name prop is required");
-  }
-
-  if (!req["select"].is<picojson::array>()) {
-    return setError(res, "select prop must be an array");
-  }
-
-  if (!req["filters"].is<picojson::array>()) {
-    return setError(res, "filters prop must be an array");
-  }
-
-  if (!req["group_by"].is<picojson::array>()) {
-    return setError(res, "group_by prop must be an array");
-  }
-
-  if (!req["order_by"].is<picojson::array>()) {
-    return setError(res, "order_by prop must be an array");
-  }
-
-  if (req["debug"].is<bool>()) {
-    debug = req["debug"].get<bool>();
-  }
-
-  if (req["limit"].is<double>()) {
-    limit = (int) req["limit"].get<int64_t>();
-  }
-
-  tableName = req["name"].to_str();
-
-  if (httpServer.tables.count(tableName) == 0) {
-    return setError(res, "table not found");
-  }
-
-  Table *table = httpServer.tables[tableName];
-  query = new Query(table, debug);
-
-  if (limit != -1) {
-    query->limit = limit;
-  }
-
-  for (auto &&row : req["select"].get<picojson::array>()) {
-    if (!row.is<picojson::object>()) {
-      err = "each select expression must be an object";
-      goto error;
-    }
-
-    picojson::object& obj = row.get<picojson::object>();
-    SelectExpr *selectExpr;
-    string field;
-    string aggrFunc;
-    string display;
-
-    if (!obj["field"].is<string>()) {
-      err = "select: field prop is required in each filter obj.";
-      goto error;
-    }
-
-    field = obj["field"].get<string>();
-
-    if (field.empty()) {
-      err = "select: field can not be empty";
-      goto error;
-    }
-
-    selectExpr = new SelectExpr(field);
-
-    if (obj["display"].is<string>()) {
-      selectExpr->display = obj["display"].get<string>();
-    }
-
-    if (obj["aggr_func"].is<string>()) {
-      selectExpr->aggerationFunc = obj["aggr_func"].get<string>();
-      selectExpr->isAggerationSelect = true;
-    }
-
-    // add this information to selectedFields array
-    if (!selectExpr->display.empty()) {
-      selectedFields.push_back(picojson::value(selectExpr->display));
-    } else if (!selectExpr->isAggerationSelect) {
-      selectedFields.push_back(picojson::value(selectExpr->field));
-    } else {
-      selectedFields.push_back(picojson::value(selectExpr->aggerationFunc + "(" + selectExpr->field + ")"));
-    }
-
-    query->selectExprs.push_back(selectExpr);
-  }
-
-  for (auto &&row : req["filters"].get<picojson::array>()) {
-    if (!row.is<picojson::object>()) {
-      err = "each filter must be an object";
-      goto error;
-    }
-
-    picojson::object& obj = row.get<picojson::object>();
-    string field;
-    string op;
-    string value;
-
-    if (!obj["field"].is<string>()) {
-      err = "filters: field prop is required in each filter obj.";
-      goto error;
-    }
-
-    field = obj["field"].get<string>();
-
-    if (field.empty()) {
-      err = "filters: field can not be empty";
-      goto error;
-    }
-
-    if (!obj["operator"].is<string>()) {
-      err = "filters: field prop is required in each filter obj.";
-      goto error;
-    }
-
-    op = obj["operator"].get<string>();
-
-    if (op.empty()) {
-      err = "filters: operator can not be empty";
-      goto error;
-    }
-
-    if (!obj["value"].is<string>()) {
-      err = "filters: value prop is required in each filter obj.";
-      goto error;
-    }
-
-    value = obj["value"].get<string>();
-
-    if (value.empty()) {
-      err = "filters: value can not be empty";
-      goto error;
-    }
-
-    cout << "new filter: " << field << op << value << endl;
-    query->filterExprs.push_back(new FilterExpr(field, op, value));
-  }
-
-  for (auto &&row : req["group_by"].get<picojson::array>()) {
-    if (!row.is<picojson::object>()) {
-      err = "each group by expression must be an object";
-      goto error;
-    }
-
-    picojson::object& obj = row.get<picojson::object>();
-    string field;
-
-    if (!obj["field"].is<string>()) {
-      err = "group by: field prop is required in each filter obj.";
-      goto error;
-    }
-
-    field = obj["field"].get<string>();
-
-    if (field.empty()) {
-      err = "group by: field can not be empty";
-      goto error;
-    }
-
-    query->groupByExprs.push_back(new GroupByExpr(field));
-  }
-
-  for (auto &&row : req["order_by"].get<picojson::array>()) {
-    if (!row.is<picojson::object>()) {
-      err = "each order by expression must be an object";
-      goto error;
-    }
-
-    picojson::object& obj = row.get<picojson::object>();
-    string field;
-
-    if (!obj["field"].is<string>()) {
-      err = "order by: field prop is required in each filter obj.";
-      goto error;
-    }
-
-    field = obj["field"].get<string>();
-
-    if (field.empty()) {
-      err = "order by: field can not be empty";
-      goto error;
-    }
-
-    auto orderByExpr = new OrderByExpr(field);
-
-    if (obj["asc"].is<bool>()) {
-      orderByExpr->asc = obj["asc"].get<bool>();
-    }
-
-    query->orderByExprs.push_back(orderByExpr);
-  }
-
-  start = std::chrono::system_clock::now();
-
-  query->isAggregationQuery = true;
-  query->run();
-
-  elapsed = std::chrono::system_clock::now() - start;
-  milliseconds = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
-  microseconds = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
-
-  for (auto &&row : query->result.rows) {
-    picojson::array picoRow;
-
-    for (auto &&value : row->values) {
-      if (value->type == FIELD_TYPE_STRING) {
-        picoRow.push_back(picojson::value(value->getStrVal()));
-      } else if (value->type == FIELD_TYPE_TIMESTAMP) {
-        picoRow.push_back(picojson::value(value->getInt64Val()));
-      } else if (value->type == FIELD_TYPE_BIGINT) {
-        picoRow.push_back(picojson::value((int64_t) value->getUInt64Val()));
-      } else {
-        err = "invalid result row value type: " + to_string(value->type);
-        goto error;
-      }
-    }
-
-    resultRows.push_back(picojson::value(picoRow));
-  }
-
-  if (req["query_stats_detailed"].is<bool>() && req["query_stats_detailed"].get<bool>() == true) {
-    queryStats["filter_us"] = picojson::value(query->stats.filter_us);
-    queryStats["filter_ms"] = picojson::value(query->stats.filter_ms);
-    queryStats["group_us"] = picojson::value(query->stats.group_us);
-    queryStats["group_ms"] = picojson::value(query->stats.group_ms);
-    queryStats["order_us"] = picojson::value(query->stats.order_us);
-    queryStats["order_ms"] = picojson::value(query->stats.order_ms);
-    res["query_stats_detailed"] = picojson::value(queryStats);
-  }
-
-  res["elapsed_ms"] = picojson::value((int64_t) milliseconds);
-  res["elapsed_us"] = picojson::value((int64_t) microseconds);
-  res["columns"] = picojson::value(selectedFields);
-  res["rows"] = picojson::value(resultRows);
-
-  delete query;
-
-  return true;
-
-  error:
-
-  if (query) {
-    delete query;
-  }
-
-  return setError(res, err);
-}
-
 int main() {
   // start http server
   httpServerInit();
 
   cout << "starting http server on :3000" << endl;
 
-  httpServer.server.resource["/api/v1/command"]["POST"] = httpHandler;
-  httpServer.server.default_resource["POST"] = httpHandler;
+  server.resource["/api/v1/command"]["POST"] = httpHandler;
+  server.default_resource["POST"] = httpHandler;
 
-  httpServer.server.default_resource["GET"] = [](shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) {
+  server.default_resource["GET"] = [](shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) {
     string msg = "hello, merlin";
     *response << "HTTP/1.1 200 OK\r\n"
               << "Content-Type: text/plain\r\n"
@@ -686,8 +160,8 @@ int main() {
               << msg;
   };
 
-  httpServer.server.config.port = 3000;
-  httpServer.server.start();
+  server.config.port = 3000;
+  server.start();
 
   httpServerDeinit();
 
