@@ -44,6 +44,12 @@ SelectExpr *Query::findSelectExprByDisplayValue(string displayValue) {
   return nullptr;
 }
 
+static void clearAggrGroups(vector<AggregationGroup *> groups) {
+  for (auto group : groups) {
+    delete group;
+  }
+}
+
 void Query::genAggrGroups() {
   vector<AggregationGroup *> result;
   for (auto &&groupByExpr : groupByExprs) {
@@ -104,10 +110,15 @@ void Query::genAggrGroups() {
 
         if (isAggerationGroupBy) {
           aggrSelectExpr->groups = std::move(groups);
+        } else {
+          for (auto &&it : groups) {
+            delete it.second;
+          }
         }
       }
     }
 
+    clearAggrGroups(result);
     result = aggrGroupsField;
   }
 
