@@ -106,7 +106,7 @@ map<string, Roaring *> Field::genGroups(Roaring *initialBitmap) {
     default: throw std::runtime_error("field \"" + name + "\": unsupported field type " + to_string(type) + " for group by.");
   }
 
-  return result;
+  return std::move(result);
 };
 
 static bool aggrFuncDateSecondsGroup(uint32_t value, void *data) {
@@ -153,7 +153,7 @@ map<string, Roaring *> Field::genGroups(Roaring *initialBitmap, string func, vec
     result[to_string(timeStamp.first)] = timeStamp.second;
   }
 
-  return result;
+  return std::move(result);
 }
 
 uint64_t Field::aggrFuncMin(Roaring *bitmap) {
