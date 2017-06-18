@@ -288,7 +288,7 @@ static bool aggrFuncMaxInt(uint32_t value, void *data) {
 
 static bool aggrFuncSumInt(uint32_t value, void *data) {
   const auto ctx = (aggr_func_sum_data *) data;
-  const auto ival = ctx->field->storage.ivals[value];
+  const auto ival = ctx->field->storage.ivals[value - 1];
 
   ctx->sum += ival;
 
