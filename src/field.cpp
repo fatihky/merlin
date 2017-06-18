@@ -94,6 +94,7 @@ map<string, Roaring *> Field::genGroups(Roaring *initialBitmap) {
           for (auto &&val : storage.strval.dict.dict) {
             const auto bitmap = new Roaring((*val.second) & *initialBitmap);
             if (bitmap->cardinality() == 0) {
+              delete bitmap;
               continue;
             }
             result[val.first] = bitmap;
