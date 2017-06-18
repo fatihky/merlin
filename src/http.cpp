@@ -231,7 +231,10 @@ static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &htt
   return true;
 
   error:
-    return setError(res, err);
+
+  delete table;
+
+  return setError(res, err);
 }
 
 static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
