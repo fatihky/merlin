@@ -363,6 +363,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   string tableName;
   string err;
   bool debug = false;
+  int limit = -1;
   picojson::array selectedFields;
   picojson::array resultRows;
   picojson::object queryStats;
@@ -395,6 +396,10 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
     debug = req["debug"].get<bool>();
   }
 
+  if (req["limit"].is<double>()) {
+    limit = (int) req["limit"].get<int64_t>();
+  }
+
   tableName = req["name"].to_str();
 
   if (httpServer.tables.count(tableName) == 0) {
@@ -403,6 +408,10 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
 
   Table *table = httpServer.tables[tableName];
   query = new Query(table, debug);
+
+  if (limit != -1) {
+    query->limit = limit;
+  }
 
   for (auto &&row : req["select"].get<picojson::array>()) {
     if (!row.is<picojson::object>()) {

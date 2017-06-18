@@ -107,6 +107,7 @@ class Query {
   vector<GroupByExpr *> groupByExprs;
   vector<OrderByExpr *> orderByExprs;
   vector<AggregationGroup *> aggregationGroups;
+  int limit;
   bool isAggregationQuery;
   QueryResult result;
   Roaring *initialBitmap;
@@ -128,6 +129,7 @@ class Query {
     table = table_;
     initialBitmap = nullptr;
     debug = debug_;
+    limit = -1;
   }
 
   ~Query() {
@@ -160,6 +162,7 @@ class Query {
   void genAggrGroups();
   void genResultRows();
   void applyOrder();
+  void applyLimit();
   void printResultRows();
   void run();
 

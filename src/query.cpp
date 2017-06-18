@@ -259,6 +259,18 @@ void Query::applyOrder() {
   });
 }
 
+void Query::applyLimit() {
+  if (limit == -1 || limit >= result.rows.size()) {
+    return;
+  }
+
+  for (auto it = result.rows.begin() + limit; it != result.rows.end(); it++) {
+    delete *it;
+  }
+
+  result.rows.erase(result.rows.begin() + limit, result.rows.end());
+}
+
 void Query::printResultRows() {
   const auto selectExprCount = selectExprs.size();
 
@@ -340,6 +352,9 @@ void Query::run() {
   elapsed = std::chrono::system_clock::now() - start;
   stats.order_us = std::chrono::duration_cast<std::chrono::microseconds>(elapsed).count();
   stats.order_ms = std::chrono::duration_cast<std::chrono::milliseconds>(elapsed).count();
+
+  // apply limit
+  applyLimit();
 
   // reset initial bitmap
   initialBitmap = nullptr;
