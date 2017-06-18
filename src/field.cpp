@@ -2,7 +2,7 @@
 
 struct aggr_func_date_seconds_group_data {
   int64_t seconds;
-  map<int64_t, Roaring *> &result;
+  map<int64_t, roaring_bitmap_t *> &result;
   Field *field;
 };
 
@@ -30,10 +30,10 @@ void Field::addValue(const GenericValueContainer &genericValueContainer) {
           uint32_t index = (uint32_t) size + 1;
 
           if (storage.strval.dict.dict.count(key)) {
-            storage.strval.dict.dict[key]->add(index);
+            roaring_bitmap_add(storage.strval.dict.dict[key], index);
           } else {
-            storage.strval.dict.dict[key] = new Roaring();
-            storage.strval.dict.dict[key]->add(index);
+            storage.strval.dict.dict[key] = roaring_bitmap_create();
+            roaring_bitmap_add(storage.strval.dict.dict[key], index);
           }
         } break;
 
@@ -42,7 +42,7 @@ void Field::addValue(const GenericValueContainer &genericValueContainer) {
     } break;
     case FIELD_TYPE_BOOLEAN: {
       if (genericValueContainer.bVal) {
-        storage.bvals->add((uint32_t) size);
+        roaring_bitmap_add(storage.bvals, (uint32_t) size + 1);
       }
     } break;
     default: throw std::runtime_error("unknown field type");
@@ -51,7 +51,7 @@ void Field::addValue(const GenericValueContainer &genericValueContainer) {
   size++;
 }
 
-Roaring *Field::getBitmap(string op, string value) {
+roaring_bitmap_t *Field::getBitmap(string op, string value) {
   switch (type) {
     case FIELD_TYPE_STRING: {
       switch (encoding) {
@@ -76,8 +76,8 @@ Roaring *Field::getBitmap(string op, string value) {
   return nullptr;
 }
 
-map<string, Roaring *> Field::genGroups(Roaring *initialBitmap) {
-  map<string, Roaring *> result;
+map<string, roaring_bitmap_t *> Field::genGroups(roaring_bitmap_t *initialBitmap) {
+  map<string, roaring_bitmap_t *> result;
 
   switch (type) {
     case FIELD_TYPE_TIMESTAMP: {
@@ -92,9 +92,9 @@ map<string, Roaring *> Field::genGroups(Roaring *initialBitmap) {
       switch (encoding) {
         case FIELD_ENCODING_DICT: {
           for (auto &&val : storage.strval.dict.dict) {
-            const auto bitmap = new Roaring((*val.second) & *initialBitmap);
-            if (bitmap->cardinality() == 0) {
-              delete bitmap;
+            roaring_bitmap_t *bitmap = roaring_bitmap_and(val.second, initialBitmap);
+            if (roaring_bitmap_get_cardinality(bitmap) == 0) {
+              roaring_bitmap_free(bitmap);
               continue;
             }
             result[val.first] = bitmap;
@@ -114,22 +114,22 @@ static bool aggrFuncDateSecondsGroup(uint32_t value, void *data) {
   const auto timestamp = ctx->field->storage.timestamps[value - 1];
   //  const int64_t group = timestamp - (int64_t) fastrange64((uint64_t) timestamp, (uint64_t) ctx->seconds);
   const int64_t group = timestamp - (timestamp % ctx->seconds);
-  Roaring *roar = nullptr;
+  roaring_bitmap_t *roar = nullptr;
 
   if (ctx->result.count(group) == 1) {
     roar = ctx->result[group];
   } else {
-    roar = new Roaring();
+    roar = roaring_bitmap_create();
     ctx->result[group] = roar;
   }
 
-  roar->add(value);
+  roaring_bitmap_add(roar, value);
   return true;
 }
 
-map<string, Roaring *> Field::genGroups(Roaring *initialBitmap, string func, vector<string> funcArgs) {
-  map<string, Roaring *> result;
-  map<int64_t, Roaring *> intResult;
+map<string, roaring_bitmap_t *> Field::genGroups(roaring_bitmap_t *initialBitmap, string func, vector<string> funcArgs) {
+  map<string, roaring_bitmap_t *> result;
+  map<int64_t, roaring_bitmap_t *> intResult;
 
   if (type != FIELD_TYPE_TIMESTAMP) {
     throw std::runtime_error("field \"" + name + "\" has invalid field type " + to_string(type) + "aggr functions on select only supported for timestamp fields.");
@@ -147,7 +147,7 @@ map<string, Roaring *> Field::genGroups(Roaring *initialBitmap, string func, vec
     .field = this
   };
 
-  initialBitmap->iterate(aggrFuncDateSecondsGroup, (void *) &aggrResult);
+  roaring_iterate(initialBitmap, aggrFuncDateSecondsGroup, (void *) &aggrResult);
 
   for (auto &&timeStamp : aggrResult.result) {
     result[to_string(timeStamp.first)] = timeStamp.second;
@@ -156,14 +156,14 @@ map<string, Roaring *> Field::genGroups(Roaring *initialBitmap, string func, vec
   return std::move(result);
 }
 
-uint64_t Field::aggrFuncMin(Roaring *bitmap) {
+uint64_t Field::aggrFuncMin(roaring_bitmap_t *bitmap) {
   int min = INT_MAX;
 
   if (type != FIELD_TYPE_INT) {
     throw std::runtime_error("only int fields supported by min()");
   }
 
-  roaring_uint32_iterator_t *i = roaring_create_iterator(&bitmap->roaring);
+  roaring_uint32_iterator_t *i = roaring_create_iterator(bitmap);
 
   while(i->has_value) {
     auto curr = storage.ivals[i->current_value - 1];
@@ -176,14 +176,14 @@ uint64_t Field::aggrFuncMin(Roaring *bitmap) {
   return (uint64_t) min;
 }
 
-uint64_t Field::aggrFuncMax(Roaring *bitmap) {
+uint64_t Field::aggrFuncMax(roaring_bitmap_t *bitmap) {
   int max = INT_MIN;
 
   if (type != FIELD_TYPE_INT) {
     throw std::runtime_error("only int fields supported by max()");
   }
 
-  roaring_uint32_iterator_t *i = roaring_create_iterator(&bitmap->roaring);
+  roaring_uint32_iterator_t *i = roaring_create_iterator(bitmap);
 
   while(i->has_value) {
     auto curr = storage.ivals[i->current_value - 1];
@@ -196,14 +196,14 @@ uint64_t Field::aggrFuncMax(Roaring *bitmap) {
   return (uint64_t) max;
 }
 
-uint64_t Field::aggrFuncSum(Roaring *bitmap) {
+uint64_t Field::aggrFuncSum(roaring_bitmap_t *bitmap) {
   uint64_t sum = 0;
 
   if (type != FIELD_TYPE_INT) {
     throw std::runtime_error("only int fields supported by sum()");
   }
 
-  roaring_uint32_iterator_t *i = roaring_create_iterator(&bitmap->roaring);
+  roaring_uint32_iterator_t *i = roaring_create_iterator(bitmap);
 
   while(i->has_value) {
     sum += storage.ivals[i->current_value - 1];

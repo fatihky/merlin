@@ -5,6 +5,7 @@ set(CMAKE_CXX_STANDARD 11)
 
 # roaring bitmap include dirs
 include_directories(deps/CRoaring/include deps/CRoaring/cpp)
+include_directories(deps/CRoaring/include deps/CRoaring/include)
 # picojson include dirs
 include_directories(deps/picojson)
 

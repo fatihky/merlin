@@ -1,6 +1,6 @@
 #include <string>
 #include <vector>
-#include "roaring.hh"
+#include "roaring/roaring.h"
 #include "table.h"
 #include "generic-value.h"
 #include "utils.h"
@@ -18,7 +18,7 @@ class SelectExpr {
   vector<string> aggerationFuncArgs;
   bool isAggerationSelect;
   // this is for dateSecondsGroup function currently
-  map<string, Roaring *> groups;
+  map<string, roaring_bitmap_t *> groups;
 
   SelectExpr(string field_): field(field_), isAggerationSelect(false) {}
   SelectExpr(string field_, string aggerationFunc_): field(field_), aggerationFunc(aggerationFunc_), isAggerationSelect(true) {}
@@ -55,26 +55,30 @@ class OrderByExpr {
 class AggregationGroup {
   public:
   vector<string> keys;
-  Roaring *bitmap;
+  roaring_bitmap_t *bitmap;
   map<string, string> valueMap; // field > value
 
-  AggregationGroup(AggregationGroup *group) {
-    keys = group->keys;
-    valueMap = group->valueMap;
-    bitmap = new Roaring(*group->bitmap);
-  }
-
-  AggregationGroup(string field, string initialKey, Roaring *initialBitmap) {
+  AggregationGroup(string field, string initialKey, roaring_bitmap_t *initialBitmap) {
     keys.push_back(initialKey);
     valueMap[field] = initialKey;
-    bitmap = new Roaring(*initialBitmap);
+    bitmap = roaring_bitmap_copy(initialBitmap);
   }
 
-  AggregationGroup *clone(string field, string key, Roaring *bitmap) {
-    auto clone = new AggregationGroup(this);
+  AggregationGroup(AggregationGroup *group, bool copyBitmap = true) {
+    keys = group->keys;
+    valueMap = group->valueMap;
+    if (copyBitmap) {
+      bitmap = roaring_bitmap_copy(group->bitmap);
+    } else {
+      bitmap = nullptr;
+    }
+  }
+
+  AggregationGroup *clone(string field, string key, roaring_bitmap_t *bitmap) {
+    auto clone = new AggregationGroup(this, false);
     clone->keys.push_back(key);
     clone->valueMap[field] = key;
-    *clone->bitmap &= *bitmap;
+    clone->bitmap = roaring_bitmap_and(this->bitmap, bitmap);
     return clone;
   }
 
@@ -115,7 +119,7 @@ class Query {
   int limit;
   bool isAggregationQuery;
   QueryResult result;
-  Roaring *initialBitmap;
+  roaring_bitmap_t *initialBitmap;
   Table *table;
   bool debug;
 

@@ -18,18 +18,18 @@ void Query::applyFilters() {
       // while we always doing AND on result bitmaps,
       // we could get empty bitmap
       // so I am resetting result bitmap and stopping loop
-      roaring_bitmap_clear(&result->roaring);
+      roaring_bitmap_clear(result);
       break;
     }
 
     if (debug) {
-      cout << "field's bitmap's cardinality: " << bitmap->cardinality() << endl;
+      cout << "field's bitmap's cardinality: " << roaring_bitmap_get_cardinality(bitmap) << endl;
     }
 
-    (*result) &= *bitmap;
+    roaring_bitmap_and_inplace(result, bitmap);
 
     if (debug) {
-      cout << "current bitmap's cardinality: " << result->cardinality() << endl;
+      cout << "current bitmap's cardinality: " << roaring_bitmap_get_cardinality(result) << endl;
     }
   }
 }
@@ -69,7 +69,8 @@ void Query::genAggrGroups() {
         const auto aggregationGroup = new AggregationGroup(field->name, group.first, group.second);
         aggrGroupsField.push_back(aggregationGroup);
         if (debug) {
-          cout << "created group for... " << group.first << " bitmap size: " << aggregationGroup->bitmap->cardinality()
+          cout << "created group for... " << group.first << " bitmap size: "
+               << roaring_bitmap_get_cardinality(aggregationGroup->bitmap)
                << endl;
         }
       }
@@ -102,9 +103,7 @@ void Query::genAggrGroups() {
             cout << "generated group for... " << group.first << endl;
             cout << "generated keys: ";
             dumpStrVector(aggregationGroup->keys);
-            cout << " | bitmap size: ";
-            aggregationGroup->bitmap->cardinality();
-            cout << endl;
+            cout << " | bitmap size: " << roaring_bitmap_get_cardinality(aggregationGroup->bitmap) << endl;
           }
         }
 
@@ -141,9 +140,9 @@ void Query::genResultRows() {
           }
 
           if (debug) {
-            cout << "[" << aggrGroup->bitmap->cardinality() << "] ";
+            cout << "[" << roaring_bitmap_get_cardinality(aggrGroup->bitmap) << "] ";
           }
-          row->values.push_back(new GenericValueContainer(aggrGroup->bitmap->cardinality()));
+          row->values.push_back(new GenericValueContainer(roaring_bitmap_get_cardinality(aggrGroup->bitmap)));
         } else if (selectExpr->aggerationFunc == "min") {
           const auto field = table->fields[selectExpr->field];
           const auto min = field->aggrFuncMin(aggrGroup->bitmap);
@@ -168,7 +167,7 @@ void Query::genResultRows() {
         } else if (selectExpr->aggerationFunc == "avg" || selectExpr->aggerationFunc == "mean") {
           const auto field = table->fields[selectExpr->field];
           const auto sum = field->aggrFuncSum(aggrGroup->bitmap);
-          const auto avg = sum / aggrGroup->bitmap->cardinality();
+          const auto avg = sum / roaring_bitmap_get_cardinality(aggrGroup->bitmap);
           if (debug) {
             cout << "[" << avg << "] ";
           }
@@ -328,15 +327,15 @@ void Query::printResultRows() {
 
 void Query::run() {
   // prepare initial bitmap
-  Roaring *roar;
+  roaring_bitmap_t *roar;
   chrono::time_point<chrono::system_clock> start;
   chrono::duration<double> elapsed;
   long long duration;
 
   if (table->size > 0) {
-    roar = new Roaring(roaring_bitmap_from_range(1, table->size + 1, 1));
+    roar = roaring_bitmap_from_range(1, table->size + 1, 1);
   } else {
-    roar = new Roaring();
+    roar = roaring_bitmap_create();
   }
   initialBitmap = roar;
 

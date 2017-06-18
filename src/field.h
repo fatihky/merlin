@@ -6,7 +6,7 @@
 #include <vector>
 #include <map>
 #include <stdlib.h>
-#include "roaring.hh"
+#include "roaring/roaring.h"
 #include "../deps/fastrange/fastrange.h"
 #include "field-types.h"
 #include "generic-value.h"
@@ -31,7 +31,7 @@ class Field {
     // FIELD_TYPE_INT
     vector<int> ivals;
     // FIELD_TYPE_BOOLEAN
-    Roaring *bvals;
+    roaring_bitmap_t *bvals;
     // FIELD_TYPE_STRING
     struct {
       struct {
@@ -40,13 +40,13 @@ class Field {
       } raw;
       struct {
         // FIELD_ENCODING_DICT
-        map<string, Roaring *> dict;
+        map<string, roaring_bitmap_t *> dict;
       } dict;
       struct {
         // FIELD_ENCODING_MULTI_VAL
         vector<vector<int>> valArrays;
         map<string, int> idMap;
-        map<int, Roaring *> idToBitmap;
+        map<int, roaring_bitmap_t *> idToBitmap;
       } multi_val;
     } strval;
 
@@ -65,17 +65,17 @@ class Field {
 
   void addValue(const GenericValueContainer &genericValueContainer);
 
-  Roaring *getBitmap(string op, string value);
+  roaring_bitmap_t *getBitmap(string op, string value);
 
-  map<string, Roaring *> genGroups(Roaring *initialBitmap);
+  map<string, roaring_bitmap_t *> genGroups(roaring_bitmap_t *initialBitmap);
 
-  map<string, Roaring *> genGroups(Roaring *initialBitmap, string func, vector<string> funcArgs);
+  map<string, roaring_bitmap_t *> genGroups(roaring_bitmap_t *initialBitmap, string func, vector<string> funcArgs);
 
-  uint64_t aggrFuncMin(Roaring *bitmap);
+  uint64_t aggrFuncMin(roaring_bitmap_t *bitmap);
 
-  uint64_t aggrFuncMax(Roaring *bitmap);
+  uint64_t aggrFuncMax(roaring_bitmap_t *bitmap);
 
-  uint64_t aggrFuncSum(Roaring *bitmap);
+  uint64_t aggrFuncSum(roaring_bitmap_t *bitmap);
 };
 
 #endif //MERLIN_FIELD_H

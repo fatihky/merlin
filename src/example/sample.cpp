@@ -3,7 +3,6 @@
 #include <map>
 #include <vector>
 #include <cassert>
-#include "roaring.hh"
 #include "../table.h"
 #include "../query.h"
 
