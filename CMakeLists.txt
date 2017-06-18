@@ -20,7 +20,7 @@ endif()
 
 add_subdirectory("deps/CRoaring")
 
-set(LIBRARY_SOURCES src/query.cpp src/query.h src/generic-value.h src/field.h src/field-types.h src/table.h src/utils.h src/utils.cpp src/http.h)
+set(LIBRARY_SOURCES src/query.cpp src/query.h src/generic-value.h src/field.h src/field-types.h src/table.h src/utils.h src/utils.cpp src/http.h src/field.cpp)
 set(HTTP_SERVER_SOURCES src/http.cpp)
 set(LIBS roaring uWS ssl z uv)
 
