@@ -7,3 +7,6 @@
 [submodule "deps/CRoaring"]
 	path = deps/CRoaring
 	url = git@github.com:RoaringBitmap/CRoaring
+[submodule "deps/Simple-Web-Server"]
+	path = deps/Simple-Web-Server
+	url = git@github.com:eidheim/Simple-Web-Server.git

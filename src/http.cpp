@@ -1,9 +1,10 @@
 #include <iostream>
 #include <map>
-#include <uWS/uWS.h>
-#include <uv.h>
+#include <netdb.h> // NI_MAXHOST, required by Simple-Web-Server
+#include <netinet/ip.h> // ip_mreq, required by Simple-Web-Server
 #include "table.h"
 #include "query.h"
+#include "server_http.hpp"
 
 // picojson and roaring bitmap both declares this
 // but picojson does does not check whether this
@@ -16,32 +17,55 @@
 
 using namespace std;
 
+typedef SimpleWeb::Server<SimpleWeb::HTTP> HttpServer;
+
+class MerlinHttpServerResponse {
+  public:
+
+  std::shared_ptr<HttpServer::Response> response;
+
+  MerlinHttpServerResponse(std::shared_ptr<HttpServer::Response> response_): response(response_) {}
+
+  void end(const char *res, size_t length) {
+    string contentType = "text/plain; charset=utf-8";
+
+    if (length > 0 && res[0] == '{') {
+      contentType = "application/json; charset=utf-8";
+    }
+
+    *response << "HTTP/1.1 200 OK\r\n"
+              << "Content-Type: " << contentType << "\r\n"
+              << "Content-Length: " << length << "\r\n\r\n"
+              << res;
+  }
+};
+
 // return values:
 // true: send response document to the client
 // false: do not send anything, handler already sent custom response
-typedef bool (*CommandHandlerFunc) (uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+typedef bool (*CommandHandlerFunc) (MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
 
 struct MerlinHttpServer {
   map<string, CommandHandlerFunc> commandHandlers;
   map<string, Table *> tables;
-  uWS::Hub hub;
+  HttpServer server;
 };
 
 // http request handler
-void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes);
+void httpHandler(shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request);
 
 // request validator
-static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, picojson::object &doc);
+static bool validateRequestBody(MerlinHttpServerResponse &res, picojson::object &doc);
 
 // command handlers
-static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
-static bool commandQuit(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
-static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
-static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
-static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
-static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
-static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
-static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res);
+static bool commandPing(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
+static bool commandQuit(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
+static bool commandShowTables(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
+static bool commandCreateTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
+static bool commandDescribeTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
+static bool commandDropTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
+static bool commandInsertIntoTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
+static bool commandQueryTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res);
 
 // global server context
 static MerlinHttpServer httpServer = {
@@ -76,7 +100,7 @@ void httpServerInit() {
   httpServer.commandHandlers["insert_into_table"] = commandInsertIntoTable;
   httpServer.commandHandlers["query_table"] = commandQueryTable;
 
-  httpServer.hub.onHttpRequest(httpHandler);
+//  httpServer.hub.onHttpRequest(httpHandler);
 }
 
 void httpServerDeinit() {
@@ -86,28 +110,27 @@ void httpServerDeinit() {
   }
 }
 
-void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_t length, size_t remainingBytes) {
-  if (req.getMethod() != uWS::METHOD_POST) {
-    return res->end("only post is supported", 22);
-  }
+void httpHandler(shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) {
+  auto res = MerlinHttpServerResponse(response);
+  auto content = request->content.string();
 
-  if (length == 0) {
-    return res->end("no request body found", 21);
+  if (content.size() == 0) {
+    return res.end("no request body found", 21);
   }
 
   picojson::value documentWrap;
   string parseErr;
-  picojson::parse(documentWrap, data, data + length, &parseErr);
+  picojson::parse(documentWrap, content.c_str(), content.c_str() + content.size(), &parseErr);
 
   if (!parseErr.empty()) {
-    return res->end("json is not valid", 16);
+    return res.end("json is not valid", 16);
   }
 
   if (!documentWrap.is<picojson::object>()) {
-    return res->end("a valid json object is required as request body", 47);
+    return res.end("a valid json object is required as request body", 47);
   }
 
-  if (!validateRequestBody(res, req, documentWrap.get<picojson::object>())) {
+  if (!validateRequestBody(res, documentWrap.get<picojson::object>())) {
     return;
   }
 
@@ -115,25 +138,25 @@ void httpHandler(uWS::HttpResponse *res, uWS::HttpRequest req, char *data, size_
 
   const string cmd = documentWrap.get("command").to_str();
   const auto handler = httpServer.commandHandlers[cmd];
-  const auto sendResponseDocument = handler(res, req, documentWrap.get<picojson::object>(), responseDocument);
+  const auto sendResponseDocument = handler(res, documentWrap.get<picojson::object>(), responseDocument);
 
   if (sendResponseDocument) {
     const auto responseString = picojson::value(responseDocument).serialize();
-    res->end(responseString.c_str(), responseString.size());
+    res.end(responseString.c_str(), responseString.size());
   }
 }
 
-static bool validateRequestBody(uWS::HttpResponse *res, uWS::HttpRequest &req, picojson::object &doc) {
+static bool validateRequestBody(MerlinHttpServerResponse &res, picojson::object &doc) {
   auto command = doc["command"];
 
   if (!command.is<string>()) {
-    res->end("command property is required", 28);
+    res.end("command property is required", 28);
     return false;
   }
 
   // check whether command is valid
   if (httpServer.commandHandlers.count(doc["command"].to_str()) == 0) {
-    res->end("invalid command", 15);
+    res.end("invalid command", 15);
     return false;
   }
 
@@ -146,18 +169,18 @@ static bool setError(picojson::object &res, string message) {
   return true;
 }
 
-static bool commandPing(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandPing(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   res["pong"] = picojson::value(true);
   return true;
 }
 
-static bool commandQuit(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandQuit(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   res["quit"] = picojson::value(true);
-  uv_stop(httpServer.hub.getLoop());
+  httpServer.server.stop();
   return true;
 }
 
-static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandShowTables(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   picojson::array tableNames;
 
   for (auto &&tableIter : httpServer.tables) {
@@ -169,7 +192,7 @@ static bool commandShowTables(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   return true;
 }
 
-static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandCreateTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   picojson::array tableNames;
   string tableName;
   const auto fields = req["fields"];
@@ -259,7 +282,7 @@ static bool commandCreateTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &htt
   return setError(res, err);
 }
 
-static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandDescribeTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   picojson::array fields;
   string tableName;
 
@@ -291,7 +314,7 @@ static bool commandDescribeTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &h
   return true;
 }
 
-static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandDropTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   picojson::array fields;
   string tableName;
 
@@ -315,7 +338,7 @@ static bool commandDropTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpR
   return true;
 }
 
-static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandInsertIntoTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   picojson::array fields;
   string tableName;
   string err;
@@ -382,7 +405,7 @@ static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest 
     return setError(res, err);
 }
 
-static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+static bool commandQueryTable(MerlinHttpServerResponse &httpRes, picojson::object &req, picojson::object &res) {
   Query *query = nullptr;
   picojson::array fields;
   string tableName;
@@ -652,8 +675,19 @@ int main() {
 
   cout << "starting http server on :3000" << endl;
 
-  httpServer.hub.listen(3000);
-  httpServer.hub.run();
+  httpServer.server.resource["/api/v1/command"]["POST"] = httpHandler;
+  httpServer.server.default_resource["POST"] = httpHandler;
+
+  httpServer.server.default_resource["GET"] = [](shared_ptr<HttpServer::Response> response, shared_ptr<HttpServer::Request> request) {
+    string msg = "hello, merlin";
+    *response << "HTTP/1.1 200 OK\r\n"
+              << "Content-Type: text/plain\r\n"
+              << "Content-Length: " << msg.length() << "\r\n\r\n"
+              << msg;
+  };
+
+  httpServer.server.config.port = 3000;
+  httpServer.server.start();
 
   httpServerDeinit();
 
