@@ -1,6 +1,7 @@
 #include <iostream>
 #include <map>
 #include <uWS/uWS.h>
+#include <uv.h>
 #include "table.h"
 #include "query.h"
 
