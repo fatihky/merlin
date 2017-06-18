@@ -485,7 +485,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
       goto error;
     }
 
-    value = obj["field"].get<string>();
+    value = obj["value"].get<string>();
 
     if (value.empty()) {
       err = "filters: value can not be empty";
