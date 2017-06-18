@@ -52,6 +52,7 @@ static void clearAggrGroups(vector<AggregationGroup *> groups) {
 }
 
 void Query::genAggrGroups() {
+  bool noFilter = filterExprs.size() == 0;
   vector<AggregationGroup *> result;
   for (auto &&groupByExpr : groupByExprs) {
     const auto isAggerationGroupBy = table->fields.count(groupByExpr->field) == 0;
@@ -64,8 +65,8 @@ void Query::genAggrGroups() {
     if (result.size() == 0) {
       vector<AggregationGroup *> aggrGroupsField;
       const auto groups = isAggerationGroupBy
-                          ? field->genGroups(initialBitmap, aggrSelectExpr->aggerationFunc, aggrSelectExpr->aggerationFuncArgs)
-                          : field->genGroups(initialBitmap);
+                          ? field->genGroups(noFilter ? nullptr : initialBitmap, aggrSelectExpr->aggerationFunc, aggrSelectExpr->aggerationFuncArgs)
+                          : field->genGroups(noFilter ? nullptr : initialBitmap);
       for (auto &&group : groups) {
         const auto aggregationGroup = new AggregationGroup(field->name, group.first, group.second);
         aggrGroupsField.push_back(aggregationGroup);

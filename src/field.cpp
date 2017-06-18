@@ -97,7 +97,12 @@ map<string, roaring_bitmap_t *> Field::genGroups(roaring_bitmap_t *initialBitmap
       switch (encoding) {
         case FIELD_ENCODING_DICT: {
           for (auto &&val : storage.strval.dict.dict) {
-            roaring_bitmap_t *bitmap = roaring_bitmap_and(val.second, initialBitmap);
+            roaring_bitmap_t *bitmap;
+            if (initialBitmap != nullptr) {
+              bitmap = roaring_bitmap_and(val.second, initialBitmap);
+            } else {
+              bitmap = roaring_bitmap_copy(val.second);
+            }
             if (roaring_bitmap_get_cardinality(bitmap) == 0) {
               roaring_bitmap_free(bitmap);
               continue;
