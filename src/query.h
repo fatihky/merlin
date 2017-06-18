@@ -72,16 +72,32 @@ class AggregationGroup {
     *clone->bitmap &= *bitmap;
     return clone;
   }
+
+  ~AggregationGroup() {
+    delete bitmap;
+  }
 };
 
 class QueryResultRow {
   public:
   vector<GenericValueContainer *> values;
+
+  ~QueryResultRow() {
+    for (auto &&val : values) {
+      delete val;
+    }
+  }
 };
 
 class QueryResult {
   public:
   vector<QueryResultRow *> rows;
+
+  ~QueryResult() {
+    for (auto &&row : rows) {
+      delete row;
+    }
+  }
 };
 
 class Query {
@@ -94,7 +110,6 @@ class Query {
   bool isAggregationQuery;
   QueryResult result;
   Roaring *initialBitmap;
-  Roaring *filterResult;
   Table *table;
 
   struct {
@@ -111,6 +126,32 @@ class Query {
   Query(Table *table_) {
     table = table_;
     initialBitmap = nullptr;
+  }
+
+  ~Query() {
+    for (auto &&select : selectExprs) {
+      delete select;
+    }
+
+    for (auto &&filterExpr : filterExprs) {
+      delete filterExpr;
+    }
+
+    for (auto &&groupByExpr : groupByExprs) {
+      delete groupByExpr;
+    }
+
+    for (auto &&orderByExpr : orderByExprs) {
+      delete orderByExpr;
+    }
+
+    for (auto &&aggregationGroup : aggregationGroups) {
+      delete aggregationGroup;
+    }
+
+    if (initialBitmap != nullptr) {
+      delete initialBitmap;
+    }
   }
 
   void applyFilters();

@@ -358,6 +358,7 @@ static bool commandInsertIntoTable(uWS::HttpResponse *httpRes, uWS::HttpRequest 
 }
 
 static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &httpReq, picojson::object &req, picojson::object &res) {
+  Query *query = nullptr;
   picojson::array fields;
   string tableName;
   string err;
@@ -396,7 +397,7 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   }
 
   Table *table = httpServer.tables[tableName];
-  auto query = new Query(table);
+  query = new Query(table);
 
   for (auto &&row : req["select"].get<picojson::array>()) {
     if (!row.is<picojson::object>()) {
@@ -593,10 +594,17 @@ static bool commandQueryTable(uWS::HttpResponse *httpRes, uWS::HttpRequest &http
   res["columns"] = picojson::value(selectedFields);
   res["rows"] = picojson::value(resultRows);
 
+  delete query;
+
   return true;
 
   error:
-    return setError(res, err);
+
+  if (query) {
+    delete query;
+  }
+
+  return setError(res, err);
 }
 
 int main() {

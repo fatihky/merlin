@@ -6,7 +6,7 @@
 using namespace std;
 
 void Query::applyFilters() {
-  auto *result = initialBitmap;
+  auto result = initialBitmap;
 
   for (auto &&filter : filterExprs) {
     cout << filter->field << " " << filter->op << " " << filter->val << endl;
@@ -23,8 +23,6 @@ void Query::applyFilters() {
     (*result) &= *bitmap;
     cout << "current bitmap's cardinality: " << result->cardinality() << endl;
   }
-
-  filterResult = result;
 }
 
 SelectExpr *Query::findSelectExprByDisplayValue(string displayValue) {
