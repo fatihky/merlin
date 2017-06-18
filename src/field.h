@@ -18,21 +18,6 @@ using namespace std;
 
 class Field;
 
-struct aggr_func_min_data {
-  uint64_t min;
-  Field *field;
-};
-
-struct aggr_func_max_data {
-  uint64_t max;
-  Field *field;
-};
-
-struct aggr_func_sum_data {
-  uint64_t sum;
-  Field *field;
-};
-
 struct aggr_func_date_seconds_group_data {
   int64_t seconds;
   map<int64_t, Roaring *> &result;
@@ -41,7 +26,6 @@ struct aggr_func_date_seconds_group_data {
 
 static bool aggrFuncMinInt(uint32_t value, void *data);
 static bool aggrFuncMaxInt(uint32_t value, void *data);
-static bool aggrFuncSumInt(uint32_t value, void *data);
 static bool aggrFuncDateSecondsGroup(uint32_t value, void *data);
 
 class Field {
@@ -215,85 +199,65 @@ class Field {
 
   uint64_t aggrFuncMin(Roaring *bitmap) {
     const auto field = this;
-    uint64_t min = UINT64_MAX;
-    const aggr_func_min_data ctx = {
-      .min = UINT64_MAX,
-      .field = this
-    };
+    int min = INT_MAX;
 
     if (type != FIELD_TYPE_INT) {
       throw std::runtime_error("only int fields supported by min()");
     }
 
-    bitmap->iterate(aggrFuncMinInt, (void *) &ctx);
+    roaring_uint32_iterator_t *i = roaring_create_iterator(&bitmap->roaring);
 
-    return ctx.min;
+    while(i->has_value) {
+      auto curr = storage.ivals[i->current_value - 1];
+      min = std::min(min, curr);
+      roaring_advance_uint32_iterator(i);
+    }
+
+    roaring_free_uint32_iterator(i);
+
+    return (uint64_t) min;
   }
 
   uint64_t aggrFuncMax(Roaring *bitmap) {
-    const auto field = this;
-    const aggr_func_max_data ctx = {
-      .max = 0,
-      .field = this
-    };
+    int max = INT_MIN;
 
     if (type != FIELD_TYPE_INT) {
       throw std::runtime_error("only int fields supported by max()");
     }
 
-    bitmap->iterate(aggrFuncMaxInt, (void *) &ctx);
+    roaring_uint32_iterator_t *i = roaring_create_iterator(&bitmap->roaring);
 
-    return ctx.max;
+    while(i->has_value) {
+      auto curr = storage.ivals[i->current_value - 1];
+      max = std::max(max, curr);
+      roaring_advance_uint32_iterator(i);
+    }
+
+    roaring_free_uint32_iterator(i);
+
+    return (uint64_t) max;
   }
 
   uint64_t aggrFuncSum(Roaring *bitmap) {
     const auto field = this;
-    const aggr_func_sum_data ctx = {
-      .sum = 0,
-      .field = this
-    };
+    uint64_t sum = 0;
 
     if (type != FIELD_TYPE_INT) {
       throw std::runtime_error("only int fields supported by sum()");
     }
 
-    bitmap->iterate(aggrFuncSumInt, (void *) &ctx);
+    roaring_uint32_iterator_t *i = roaring_create_iterator(&bitmap->roaring);
 
-    return ctx.sum;
+    while(i->has_value) {
+      sum += storage.ivals[i->current_value - 1];
+      roaring_advance_uint32_iterator(i);
+    }
+
+    roaring_free_uint32_iterator(i);
+
+    return sum;
   }
 };
-
-
-static bool aggrFuncMinInt(uint32_t value, void *data) {
-  const auto ctx = (aggr_func_min_data *) data;
-  const auto ival = ctx->field->storage.ivals[value];
-
-  if (ival < ctx->min) {
-    ctx->min = (uint64_t) ival;
-  }
-
-  return true;
-}
-
-static bool aggrFuncMaxInt(uint32_t value, void *data) {
-  const auto ctx = (aggr_func_max_data *) data;
-  const auto ival = ctx->field->storage.ivals[value];
-
-  if (ival > ctx->max) {
-    ctx->max = (uint64_t) ival;
-  }
-
-  return true;
-}
-
-static bool aggrFuncSumInt(uint32_t value, void *data) {
-  const auto ctx = (aggr_func_sum_data *) data;
-  const auto ival = ctx->field->storage.ivals[value - 1];
-
-  ctx->sum += ival;
-
-  return true;
-}
 
 static bool aggrFuncDateSecondsGroup(uint32_t value, void *data) {
   const auto *ctx = (aggr_func_date_seconds_group_data *) data;
