@@ -21,9 +21,7 @@ void Query::applyFilters() {
     }
     cout << "field's bitmap's cardinality: " << bitmap->cardinality() << endl;
     (*result) &= *bitmap;
-    cout << "current bitmap: ";
-    result->printf();
-    cout << endl;
+    cout << "current bitmap's cardinality: " << result->cardinality() << endl;
   }
 
   filterResult = result;
