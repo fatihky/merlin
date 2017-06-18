@@ -40,5 +40,6 @@ void commandDescribeTable(picojson::object &req, picojson::object &res);
 void commandDropTable(picojson::object &req, picojson::object &res);
 void commandInsertIntoTable(picojson::object &req, picojson::object &res);
 void commandQueryTable(picojson::object &req, picojson::object &res);
+void commandTableStatistics(picojson::object &req, picojson::object &res);
 
 #endif //MERLIN_HTTP_H

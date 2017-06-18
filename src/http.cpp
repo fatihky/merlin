@@ -71,8 +71,7 @@ void httpServerInit() {
   httpServer.commandHandlers["drop_table"] = commandDropTable;
   httpServer.commandHandlers["insert_into_table"] = commandInsertIntoTable;
   httpServer.commandHandlers["query_table"] = commandQueryTable;
-
-//  httpServer.hub.onHttpRequest(httpHandler);
+  httpServer.commandHandlers["stats_table"] = commandTableStatistics;
 }
 
 void httpServerDeinit() {

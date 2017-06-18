@@ -82,6 +82,8 @@ class Field {
     encoding = encoding_;
   }
 
+  int64_t statUsedMemory();
+
   void addValue(const GenericValueContainer &genericValueContainer);
 
   roaring_bitmap_t *getBitmap(string op, string value);

@@ -1,4 +1,9 @@
+#include <iostream>
+#include "roaring/containers/containers.h"
+#include "roaring/containers/array.h"
 #include "field.h"
+
+using namespace std;
 
 struct aggr_func_date_seconds_group_data {
   int64_t seconds;
@@ -213,4 +218,56 @@ uint64_t Field::aggrFuncSum(roaring_bitmap_t *bitmap) {
   roaring_free_uint32_iterator(i);
 
   return sum;
+}
+
+int64_t Field::statUsedMemory() {
+  switch (type) {
+    case FIELD_TYPE_TIMESTAMP: {
+      return sizeof(int64_t) * storage.timestamps.capacity();
+    }
+    case FIELD_TYPE_INT: {
+      return sizeof(int) * storage.ivals.capacity();
+    }
+    case FIELD_TYPE_STRING: {
+      switch (encoding) {
+        case FIELD_ENCODING_DICT: {
+          int sum = 0;
+          for (auto &&it : storage.strval.dict.dict) {
+            sum += it.first.size();
+            // I don't know how much bytes taken by each record
+            // so I am just adding 10
+            sum += 10;
+            // roaring bitmap does not give used memory.
+            // I will try to calculate it by hand
+            auto r = it.second;
+            for (int i = 0; i < r->high_low_container.size; i++) {
+              uint8_t typecode;
+              void *cont = ra_get_container_at_index(&r->high_low_container, i, &typecode);
+              switch (typecode) {
+                case BITSET_CONTAINER_TYPE_CODE: {
+                  sum += sizeof(bitset_container_t);
+                  sum += sizeof(uint64_t) * BITSET_CONTAINER_SIZE_IN_WORDS;
+                } break;
+                case ARRAY_CONTAINER_TYPE_CODE: {
+                  sum += sizeof(array_container_t);
+                  sum += sizeof(uint16_t) * ((array_container_t *)cont)->capacity;
+                } break;
+                case RUN_CONTAINER_TYPE_CODE: {
+                  sum += sizeof(run_container_t);
+                  sum += sizeof(rle16_t) * ((run_container_t *)cont)->capacity;
+                } break;
+                default:
+                  cout << "Field::statUsedMemory(): skipping unknown container type: " << typecode << endl;
+              }
+            }
+          }
+          return sum;
+        }
+        default:
+          throw std::runtime_error("statUsedMemory not implemented for string field encoding " + to_string(encoding));
+      }
+    }
+    default:
+      throw std::runtime_error("statUsedMemory not implemented for field type " + to_string(type));
+  }
 }
